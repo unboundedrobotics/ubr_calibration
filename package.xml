@@ -1,0 +1,37 @@
+<package>
+  <name>ubr_calibration</name>
+  <version>0.1.0</version>
+  <description>
+    Calibrate the Robot
+  </description>
+  <author>Michael Ferguson</author>
+  <maintainer email="fergs@unboundedrobotics.com">Michael Ferguson</maintainer>
+  <license>All Rights Reserved</license>
+  <url>http://ros.org/wiki/ubr_calibration</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>actionlib</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>kdl_parser</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>orocos_kdl</build_depend>
+  <build_depend>pcl_ros</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rosbag</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>ubr_msgs</build_depend>
+
+  <run_depend>actionlib</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>kdl_parser</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>orocos_kdl</run_depend>
+  <run_depend>pcl_ros</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>rosbag</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>ubr_msgs</run_depend>
+</package>
