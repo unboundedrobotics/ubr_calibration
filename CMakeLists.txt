@@ -12,9 +12,6 @@ generate_messages(DEPENDENCIES std_msgs sensor_msgs geometry_msgs)
 
 catkin_package()
 
-# cmake hack for finding gflags
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "/usr/lib/x86_64-linux-gnu")
-
 find_package(Ceres)
 if (${Ceres_FOUND})
 
