@@ -26,7 +26,7 @@ class LedFinder
 {
 public:
   LedFinder(ros::NodeHandle & n) :
-    client_("/gripper_led_command", true),
+    client_("/gripper_led_action", true),
     waiting_(false)
   {
     subscriber_ = n.subscribe("/camera/depth_registered/points", 1, &LedFinder::cameraCallback, this);
