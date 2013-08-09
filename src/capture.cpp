@@ -8,6 +8,10 @@
 #include <ubr_calibration/led_finder.h>
 #include <ubr_calibration/chain_manager.h>
 
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <rosbag/query.h>
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv,"ubr_calibration_capture");
@@ -18,8 +22,17 @@ int main(int argc, char **argv)
 
   ros::Publisher pub = nh.advertise<ubr_calibration::CalibrationData>("calibration_data", 10);
 
+  /* Load a set of calibration poses */
+  rosbag::Bag bag;
+  bag.open("calibration_poses.bag", rosbag::bagmode::Read);
+  rosbag::View data_view(bag, rosbag::TopicQuery("calibration_joint_states"));
+
   std::vector<sensor_msgs::JointState> poses;
-  // TODO: load list of poses for head/arm
+  BOOST_FOREACH (rosbag::MessageInstance const m, data_view)
+  {
+    sensor_msgs::JointState::ConstPtr msg = m.instantiate<sensor_msgs::JointState>();
+    poses.push_back(*msg);
+  }
 
   ros::AsyncSpinner spinner(1);
   spinner.start();
@@ -48,4 +61,5 @@ int main(int argc, char **argv)
     /* Publish calibration data message. */
     pub.publish(msg);
   }
+  ROS_INFO("Done Capturing Samples");
 }

@@ -30,8 +30,8 @@
  *     -# move joints to a particular place
  *     -# wait to settle
  *     -# find LED in the camera view
- *        -# find point where LED is flashing.
- *        -# create plane where point is.
+ *        -# find point where LED is flashing. (implemented, might be improved)
+ *        -# create plane where point is. (not implemented, might not be needed)
  *        -# sample center point of LED.
  *     -# write sample to bag file: joint angles, position of LED in camera. Debug data?
  *   - Calibrate:
@@ -45,7 +45,7 @@
 
 int main(int argc, char** argv)
 {
-  /* Load bagfile of calibration dat. */
+  /* Load bagfile of calibration data. */
   rosbag::Bag bag_;
   bag_.open("calibration_data.bag", rosbag::bagmode::Read);
 

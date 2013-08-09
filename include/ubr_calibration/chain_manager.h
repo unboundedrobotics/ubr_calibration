@@ -8,11 +8,9 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
-#include <control_msgs/PointHeadAction.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <actionlib/client/simple_action_client.h>
 
-typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> PointHeadClient;
 typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> TrajectoryClient;
 
 /**
@@ -23,7 +21,7 @@ class ChainManager
 {
 public:
   ChainManager(ros::NodeHandle & n) :
-    head_client_("/point_head", true),
+    head_client_("/head_controller/follow_joint_trajectory", true),
     arm_client_("/arm_controller/follow_joint_trajectory", true)
   {
     subscriber_ = n.subscribe("/joint_states", 1, &ChainManager::stateCallback, this);
@@ -63,10 +61,13 @@ public:
 private:
   void stateCallback(const sensor_msgs::JointStateConstPtr& msg);
 
+  trajectory_msgs::JointTrajectoryPoint makePoint(const sensor_msgs::JointState& state,
+                                                  const std::vector<std::string> joints);
+
   ros::Subscriber subscriber_;
   sensor_msgs::JointState state_;
 
-  PointHeadClient head_client_;
+  TrajectoryClient head_client_;
   TrajectoryClient arm_client_;
 
   std::vector<std::string> head_joints_;
