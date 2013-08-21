@@ -155,8 +155,7 @@ public:
   /** \brief Debugging information output. */
   void printResult()
   {
-    //std::cout << summary_->FullReport() << std::endl;
-
+    /* Print final estimates of points */
     for (int i = 0; i < num_observations_; ++i)
     {
       std::cout << "Final estimate: " << points_[(3*i)+0] << "," << 
@@ -164,15 +163,30 @@ public:
                                          points_[(3*i)+2] << std::endl;
     }
 
-    // Some of this code will be useful in writing URDF export
+    /* Print final calibration updates */
     std::cout << "Calibrated Params" << std::endl;
+    std::map<std::string, double> offsets = getCalibrationOffsets();
+    for (std::map<std::string, double>::const_iterator it = offsets.begin();
+         it != offsets.end(); ++it)
+    {
+      std::cout << it->first << ": " <<
+                   it->second << std::endl;
+    }
+  }
+
+  /**
+   *  \brief Returns the calibration data to apply to the URDF.
+   *         in the form of a map of joint_name:calibration_offset
+   */
+  std::map<std::string, double> getCalibrationOffsets()
+  {
+    std::map<std::string, double> offsets;
     int p = 0;
     for (int i = 0; i < arm_chain_.getNrOfSegments(); ++i)
     {
       if (arm_chain_.getSegment(i).getJoint().getType()!=KDL::Joint::None)
       {
-        std::cout << arm_chain_.getSegment(i).getJoint().getName() << ": " <<
-                     free_params_[p] << std::endl;
+        offsets[arm_chain_.getSegment(i).getJoint().getName()] = free_params_[p];
         ++p;
       }
     }
@@ -180,20 +194,19 @@ public:
     {
       if (camera_chain_.getSegment(i).getJoint().getType()!=KDL::Joint::None)
       {
-        std::cout << camera_chain_.getSegment(i).getJoint().getName() << ": " <<
-                     free_params_[p] << std::endl;
+        offsets[camera_chain_.getSegment(i).getJoint().getName()] = free_params_[p];
         ++p;
       }
     }
-    std::cout << "camera X: " << free_params_[p++] << std::endl;
-    std::cout << "camera Y: " << free_params_[p++] << std::endl;
-    std::cout << "camera Z: " << free_params_[p++] << std::endl;
-    std::cout << "camera angle: " << free_params_[p++] << 
-                              "," << free_params_[p++] << 
-                              "," << free_params_[p++] << std::endl;
+    // TODO: make this generic
+    offsets["head_camera_frame_x"] = free_params_[p++];
+    offsets["head_camera_frame_y"] = free_params_[p++];
+    offsets["head_camera_frame_z"] = free_params_[p++];
+    offsets["head_camera_frame_rot_r"] = free_params_[p++];
+    offsets["head_camera_frame_rot_p"] = free_params_[p++];
+    offsets["head_camera_frame_rot_y"] = free_params_[p++];
+    return offsets;
   }
-
-  // TODO: use free_params to update and export new URDF
 
   /** \brief Returns the summary of the optimization last run. */
   ceres::Solver::Summary* summary()

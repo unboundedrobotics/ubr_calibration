@@ -4,6 +4,17 @@ project(ubr_calibration)
 find_package(Boost REQUIRED system thread)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)  # visualization only
+
+find_library(tinyxml_library tinyxml)
+if (tinyxml_library)
+  message (STATUS "Looking for libtinyxml - found")
+  set(tinyxml_LIBRARIES ${tinyxml_library})
+endif ()
+find_path(tinyxml_include_dirs NAMES tinyxml.h PATH_SUFFIXES tinyxml)
+if (NOT tinyxml_include_dirs)
+   message (STATUS "Looking for tinyxml/tinyxml.hpp or tinyxml/tinyxml.h - not found.")
+endif ()
+
 find_package(catkin REQUIRED message_generation actionlib roscpp orocos_kdl kdl_parser ubr_msgs
                              std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
 
@@ -32,10 +43,12 @@ target_link_libraries(capture ${Boost_LIBRARIES}
 add_dependencies(capture ubr_calibration_gencpp
                          ubr_msgs_gencpp)
 
-add_executable(calibrate src/calibrate.cpp)
+add_executable(calibrate src/calibrate.cpp
+                         src/update_urdf.cpp)
 target_link_libraries(calibrate ${Boost_LIBRARIES}
                                 ${catkin_LIBRARIES}
-                                ${CERES_LIBRARIES})
+                                ${CERES_LIBRARIES}
+                                ${tinyxml_LIBRARIES})
 add_dependencies(calibrate ubr_calibration_gencpp)
 
 add_subdirectory(test)
