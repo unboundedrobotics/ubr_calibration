@@ -11,8 +11,10 @@
 #include <ubr_calibration/CalibrationData.h>
 
 #include <ubr_calibration/optimizer.h>
+#include <ubr_calibration/update_urdf.h>
 
 #include <boost/foreach.hpp>  // for rosbag iterator
+#include <fstream>
 
 /** \mainpage
  * \section parameters Parameters of the Optimization:
@@ -71,7 +73,16 @@ int main(int argc, char** argv)
   Optimizer opt(description_->data, "base_link", "gripper_link");
   opt.optimize(data, true);
   opt.printResult();
-  // TODO: use free_params to update and export new URDF
+
+  /* Update the URDF. */
+  std::map<std::string, double> offsets = opt.getCalibrationOffsets();
+  std::string s = updateURDF(description_->data, offsets);
+
+  /* Save updated URDF. */
+  std::ofstream file;
+  file.open("calibrated.urdf");
+  file << s;
+  file.close();
 
   return 0;
 }
