@@ -15,8 +15,18 @@ if (NOT tinyxml_include_dirs)
    message (STATUS "Looking for tinyxml/tinyxml.hpp or tinyxml/tinyxml.h - not found.")
 endif ()
 
+find_package(orocos_kdl)
+if (${orocos_kdl_FOUND})
+# must by hydro or later, orocos_kdl is a system dependency
+message (STATUS "using orocos-kdl system package")
+find_package(catkin REQUIRED message_generation actionlib roscpp kdl_parser ubr_msgs
+                             std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
+else (${orocos_kdl_FOUND})
+# groovy, orocos_kdl is ros package
+message (STATUS "using orocos-kdl ros package")
 find_package(catkin REQUIRED message_generation actionlib roscpp orocos_kdl kdl_parser ubr_msgs
                              std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
+endif (${orocos_kdl_FOUND})
 
 add_message_files(FILES CalibrationData.msg)
 generate_messages(DEPENDENCIES std_msgs sensor_msgs geometry_msgs)
@@ -30,7 +40,9 @@ include_directories(include ${Boost_INCLUDE_DIRS}
                             ${catkin_INCLUDE_DIRS}
                             ${CERES_INCLUDES}
                             ${OpenCV_INCLUDE_DIRS}  # visualization only
-                            ${PCL_INCLUDE_DIRS})
+                            ${PCL_INCLUDE_DIRS}
+                            ${orocos_kdl_INCLUDE_DIRS})
+link_directories(${orocos_kdl_LIBRARY_DIRS}) # this is a hack, will eventually be unneeded once orocos-kdl is fixed
 
 add_executable(capture src/capture.cpp
                        src/chain_manager.cpp
@@ -48,7 +60,8 @@ add_executable(calibrate src/calibrate.cpp
 target_link_libraries(calibrate ${Boost_LIBRARIES}
                                 ${catkin_LIBRARIES}
                                 ${CERES_LIBRARIES}
-                                ${tinyxml_LIBRARIES})
+                                ${tinyxml_LIBRARIES}
+                                ${orocos_kdl_LIBRARIES})
 add_dependencies(calibrate ubr_calibration_gencpp)
 
 add_subdirectory(test)
