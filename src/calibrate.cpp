@@ -32,17 +32,17 @@
  *     -# move joints to a particular place
  *     -# wait to settle
  *     -# find LED in the camera view
- *        -# find point where LED is flashing. (implemented, might be improved)
+ *        -# find point where LED is flashing. (might be improved)
  *        -# create plane where point is. (not implemented, might not be needed)
  *        -# sample center point of LED.
  *     -# write sample to bag file: joint angles, position of LED in camera. Debug data?
  *   - Calibrate:
- *     -# load urdf, samples from bag file. (implemented)
+ *     -# load urdf, samples from bag file.
  *     -# create pile of 3d points by projecting through arm. Create
- *        joint angles, camera pose initial values. (implemented)
- *     -# create residual blocks. (implemented, might evolve some still)
- *     -# run calibration. (implemented)
- *     -# write results to URDF. (ewww)
+ *        joint angles, camera pose initial values.
+ *     -# create residual blocks. (might evolve some still)
+ *     -# run calibration.
+ *     -# write results to URDF.
  */
 
 int main(int argc, char** argv)
