@@ -131,7 +131,13 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   point_stamped->point.x = cloud_ptr_->points[diff_max_idx].x;
   point_stamped->point.y = cloud_ptr_->points[diff_max_idx].y;
   point_stamped->point.z = cloud_ptr_->points[diff_max_idx].z;
+#if PCL_VERSION_COMPARE(<,1,7,0)
   point_stamped->header = cloud_ptr_->header;
+#else
+  point_stamped->header.seq = cloud_ptr_->header.seq;
+  point_stamped->header.frame_id = cloud_ptr_->header.frame_id;
+  point_stamped->header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
+#endif
 
   /* Publish point. */
   publisher_.publish(*point_stamped);
