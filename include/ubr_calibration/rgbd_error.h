@@ -6,6 +6,8 @@
 #ifndef UBR_CALIBRATION_RGBD_ERROR_H_
 #define UBR_CALIBRATION_RGBD_ERROR_H_
 
+#include <ubr_calibration/chain_functions.h>
+
 #include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
 #include <kdl/chainfksolverpos_recursive.hpp>
@@ -14,7 +16,8 @@
 
 #include <string>
 
-/** \brief Used to find error in reprojection using a chain of joints.
+/**
+ *  \brief Used to find error in reprojection using a chain of joints.
  *
  *  Currently, the only free parameters supported are the joint angle offsets
  *  of each joint in the chain.
@@ -93,11 +96,9 @@ struct RgbdError
       camera_correction.p.x(free_params[param_idx]);
       camera_correction.p.y(free_params[param_idx+1]);
       camera_correction.p.z(free_params[param_idx+2]);
-      /* TODO: is this correct? do we have to normalize params. */
-      camera_correction.M = KDL::Rotation::Quaternion(free_params[param_idx+3],
-                                                      free_params[param_idx+4],
-                                                      free_params[param_idx+5],
-                                                      1.0);
+      camera_correction.M = rotation_from_axis_magnitude(free_params[param_idx+3],
+                                                         free_params[param_idx+4],
+                                                         free_params[param_idx+5]);
       p_out = p_out*camera_correction;
     }
 

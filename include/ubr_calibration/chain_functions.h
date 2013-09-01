@@ -10,8 +10,9 @@
 #include <kdl/jntarray.hpp>
 #include <sensor_msgs/JointState.h>
 
-/** \brief Get a KDL::JntArray of joint positions from a sensor_msgs::JointState
- *  for a set of joints in a particular KDL::Chain. Yeah, that seems pretty specific.
+/**
+ *  \brief Get a KDL::JntArray of joint positions from a sensor_msgs::JointState
+ *         for a set of joints in a particular KDL::Chain. Yeah, that seems pretty specific.
  */
 KDL::JntArray getChainPositionsFromMsg(const KDL::Chain& chain,
                                        const sensor_msgs::JointState& msg)
@@ -41,6 +42,22 @@ KDL::JntArray getChainPositionsFromMsg(const KDL::Chain& chain,
   }
 
   return positions;
+}
+
+/**
+ *  \brief Converts our angle-axis-with-integrated-magnitude representation to a KDL::Rotation
+ */
+KDL::Rotation rotation_from_axis_magnitude(const double x, const double y, const double z)
+{
+  double magnitude = sqrt(x*x + y*y + z*z);
+
+  if (magnitude == 0.0)
+    return KDL::Rotation::Quaternion(0.0, 0.0, 0.0, 1.0);
+
+  return KDL::Rotation::Quaternion(x/magnitude * sin(magnitude/2.0),
+                                   y/magnitude * sin(magnitude/2.0),
+                                   z/magnitude * sin(magnitude/2.0),
+                                   cos(magnitude/2.0));
 }
 
 #endif  // UBR_CALIBRATION_CHAIN_FUNCTIONS_H_

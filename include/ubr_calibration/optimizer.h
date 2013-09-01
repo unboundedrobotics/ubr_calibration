@@ -202,9 +202,15 @@ public:
     offsets["head_camera_frame_x"] = free_params_[p++];
     offsets["head_camera_frame_y"] = free_params_[p++];
     offsets["head_camera_frame_z"] = free_params_[p++];
-    offsets["head_camera_frame_rot_r"] = free_params_[p++];
-    offsets["head_camera_frame_rot_p"] = free_params_[p++];
-    offsets["head_camera_frame_rot_y"] = free_params_[p++];
+    /* Convert Angle-Axis to RPY */
+    double roll, pitch, yaw;
+    KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[p++],
+                                                     free_params_[p++],
+                                                     free_params_[p++]);
+    rot.GetRPY(roll, pitch, yaw);
+    offsets["head_camera_frame_rot_r"] = roll;
+    offsets["head_camera_frame_rot_p"] = pitch;
+    offsets["head_camera_frame_rot_y"] = yaw;
     return offsets;
   }
 
