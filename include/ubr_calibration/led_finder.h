@@ -29,7 +29,7 @@ public:
     client_("/gripper_led_action", true),
     waiting_(false)
   {
-    subscriber_ = n.subscribe("/head_camera/depth/points_xyz", 1, &LedFinder::cameraCallback, this);
+    subscriber_ = n.subscribe("/head_camera/depth/points_xyzrgb", 1, &LedFinder::cameraCallback, this);
     client_.waitForServer();
 
     publisher_ = n.advertise<geometry_msgs::PointStamped>("led_point", 10);
