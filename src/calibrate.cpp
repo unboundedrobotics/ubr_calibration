@@ -70,7 +70,7 @@ int main(int argc, char** argv)
   }
 
   /* Create instance of optimizer. */
-  Optimizer opt(description_->data, "base_link", "gripper_link");
+  Optimizer opt(description_->data, "base_link", "gripper_led_link");
   opt.optimize(data, true);
   opt.printResult();
 
