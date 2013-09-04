@@ -139,6 +139,37 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   point_stamped->header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
 #endif
 
+  /* Do not accept NANs */
+  if (isnan(point_stamped->point.x) ||
+      isnan(point_stamped->point.y) ||
+      isnan(point_stamped->point.z))
+    return false;
+
+  /* Transform to led frame */
+  geometry_msgs::PointStamped point_led_link;
+  try
+  {
+    listener_.transformPoint("gripper_led_link", ros::Time(0), *point_stamped,
+                             point_stamped->header.frame_id, point_led_link);
+  }
+  catch(const tf::TransformException &ex)
+  {
+    ROS_ERROR("Failed to transform point to gripper_led_link");
+    return false;
+  }
+
+  /* Compute distance */
+  double distance = (point_led_link.point.x * point_led_link.point.x) +
+                    (point_led_link.point.y * point_led_link.point.y) +
+                    (point_led_link.point.z * point_led_link.point.z);
+
+  /* Point must be within a certain distance of gripper_led_link */
+  if (distance > 0.1)
+  {
+    ROS_ERROR_STREAM("Point was too far away from gripper_led_link: " << distance);
+    return false;
+  }
+
   /* Publish point. */
   publisher_.publish(*point_stamped);
 

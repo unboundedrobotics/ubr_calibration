@@ -9,6 +9,7 @@
 #include <ros/ros.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
+#include <tf/transform_listener.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
 #include <ubr_msgs/GripperLedCommandAction.h>
@@ -38,7 +39,7 @@ public:
     threshold_ = 1000;
     max_iterations_ = 50;
 
-    output_debug_image_ = true;
+    output_debug_image_ = false;
     if (output_debug_image_)
       cv::namedWindow("led_finder");
   }
@@ -65,6 +66,8 @@ private:
   int max_iterations_;  /// Maximum number of cycles before we abort finding the LED
 
   bool output_debug_image_;
+
+  tf::TransformListener listener_;
 };
 
 #endif  // UBR_CALIBRATION_LED_FINDER_H_
