@@ -73,46 +73,47 @@ bool ChainManager::moveToState(const sensor_msgs::JointState& state)
 bool ChainManager::waitToSettle()
 {
   sensor_msgs::JointState state;
-  std::vector<double> last(head_joints_.size() + arm_joints_.size(), 0.0);
-  std::vector<double> next(head_joints_.size() + arm_joints_.size(), 0.0);
   int stable = 0;
 
   // TODO: timeout?
   while (true)
   {
     getState(&state);
+    bool settled = true;
 
-    /* Get head positions */
-    for (size_t i = 0; i < head_joints_.size(); ++i)
+    /* For each joint in state message */
+    for (size_t j = 0; j < state.name.size(); ++j)
     {
-      for (size_t j = 0; j < state.name.size(); ++j)
+      /* Is this joint even a concern? */
+      if (fabs(state.velocity[j]) < 0.001)
+        continue;
+
+      /* Is this joint in head? */
+      for (size_t i = 0; i < head_joints_.size(); ++i)
+      {
         if (head_joints_[i] == state.name[j])
         {
-          next[i] = state.position[j];
+          settled = false;
           break;
         }
-    }
+      }
 
-    /* Get arm positions */
-    for (size_t i = 0; i < arm_joints_.size(); ++i)
-    {
-      for (size_t j = 0; j < state.name.size(); ++j)
+      /* Is this joint in the arm? */
+      for (size_t i = 0; i < arm_joints_.size(); ++i)
+      {
         if (arm_joints_[i] == state.name[j])
         {
-          next[head_joints_.size() + i] = state.position[j];
+          settled = false;
           break;
         }
+      }
+
+      /* If at least one joint is not settled, break out this for loop */
+      if (!settled)
+        break;
     }
 
-    /* Compare next to last */
-    std::vector<double> diff(last.size(), 0.0);
-    bool settled = true;
-    for (size_t i = 0; i < last.size(); ++i)
-    {
-      diff[i] = next[i] - last[i];
-      settled &= (fabs(diff[i]) < 0.001);  // TODO: set this value by parameter and tune
-    }
-
+    /* If all joints are settled, break out of while loop */
     if (settled)
       break;
   }
