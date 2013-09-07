@@ -38,24 +38,31 @@ int main(int argc, char **argv)
   if (argc > 1)
     pose_bag_name = argv[1];
 
-  /* Load a set of calibration poses */
-  rosbag::Bag bag;
-  try
-  {
-    bag.open(pose_bag_name, rosbag::bagmode::Read);
-  }
-  catch (rosbag::BagException)
-  {
-    ROS_FATAL_STREAM("Cannot open " << pose_bag_name);
-    return -1;
-  }
-  rosbag::View data_view(bag, rosbag::TopicQuery("calibration_joint_states"));
-
+  /* Load a set of calibration poses, if not manually calibrating. */
   std::vector<sensor_msgs::JointState> poses;
-  BOOST_FOREACH (rosbag::MessageInstance const m, data_view)
+  if (pose_bag_name.compare("--manual") != 0)
   {
-    sensor_msgs::JointState::ConstPtr msg = m.instantiate<sensor_msgs::JointState>();
-    poses.push_back(*msg);
+    rosbag::Bag bag;
+    try
+    {
+      bag.open(pose_bag_name, rosbag::bagmode::Read);
+    }
+    catch (rosbag::BagException)
+    {
+      ROS_FATAL_STREAM("Cannot open " << pose_bag_name);
+      return -1;
+    }
+    rosbag::View data_view(bag, rosbag::TopicQuery("calibration_joint_states"));
+
+    BOOST_FOREACH (rosbag::MessageInstance const m, data_view)
+    {
+      sensor_msgs::JointState::ConstPtr msg = m.instantiate<sensor_msgs::JointState>();
+      poses.push_back(*msg);
+    }
+  }
+  else
+  {
+    ROS_INFO("Using manual calibration mode...");
   }
 
   ros::AsyncSpinner spinner(1);
@@ -63,12 +70,26 @@ int main(int argc, char **argv)
 
   /* For each pose in the capture sequence. */
   for (std::vector<sensor_msgs::JointState>::iterator it = poses.begin();
-       it != poses.end(); ++it)
+       (it != poses.end()) || (poses.size() == 0); ++it)
   {
     ubr_calibration::CalibrationData msg;
 
-    /* Move head/arm to pose */
-    chain_manager_.moveToState(*it);
+    if (poses.size() == 0)
+    {
+      /* Manual calibration, wait for keypress */
+      ROS_INFO("Press key when arm is ready...");
+      std::string throwaway;
+      std::getline(std::cin, throwaway);
+      if (throwaway.compare("exit") == 0)
+        break;
+    }
+    else
+    {
+      /* Move head/arm to pose */
+      chain_manager_.moveToState(*it);
+    }
+
+    /* Regardless of manual vs. automatic, wait for joints to settle */
     chain_manager_.waitToSettle();
 
     /* Get pose of the LED */
