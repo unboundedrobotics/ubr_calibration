@@ -4,6 +4,7 @@
  */
 
 #include <ros/ros.h>
+#include <std_msgs/String.h>
 #include <ubr_calibration/CalibrationData.h>
 #include <ubr_calibration/led_finder.h>
 #include <ubr_calibration/chain_manager.h>
@@ -21,6 +22,16 @@ int main(int argc, char **argv)
   ChainManager chain_manager_(nh);
 
   ros::Publisher pub = nh.advertise<ubr_calibration::CalibrationData>("calibration_data", 10);
+  ros::Publisher urdf_pub = nh.advertise<std_msgs::String>("robot_description", 1, true);
+
+  /* Get the robot_description and republish it */
+  std_msgs::String description_msg;
+  if (!nh.getParam("robot_description", description_msg.data))
+  {
+    ROS_FATAL("robot_description not set!");
+    exit(-1);
+  }
+  urdf_pub.publish(description_msg);
 
   /* Load a set of calibration poses */
   rosbag::Bag bag;
