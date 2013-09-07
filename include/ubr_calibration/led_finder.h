@@ -31,6 +31,7 @@ public:
     waiting_(false)
   {
     subscriber_ = n.subscribe("/head_camera/depth_registered/points", 1, &LedFinder::cameraCallback, this);
+    ROS_INFO("Waiting for gripper_led_action...");
     client_.waitForServer();
 
     publisher_ = n.advertise<geometry_msgs::PointStamped>("led_point", 10);

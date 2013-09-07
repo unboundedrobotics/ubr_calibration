@@ -26,7 +26,10 @@ public:
   {
     subscriber_ = n.subscribe("/joint_states", 1, &ChainManager::stateCallback, this);
 
+    ROS_INFO("Waiting for head_controller/follow_joint_trajectory...");
     head_client_.waitForServer();
+
+    ROS_INFO("Waiting for arm_controller/follow_joint_trajectory...");
     arm_client_.waitForServer();
 
     head_joints_.push_back("head_pan_joint");
