@@ -33,9 +33,22 @@ int main(int argc, char **argv)
   }
   urdf_pub.publish(description_msg);
 
+  /* Take name of poses from command line if supplied */
+  std::string pose_bag_name("calibration_poses.bag");
+  if (argc > 1)
+    pose_bag_name = argv[1];
+
   /* Load a set of calibration poses */
   rosbag::Bag bag;
-  bag.open("calibration_poses.bag", rosbag::bagmode::Read);
+  try
+  {
+    bag.open(pose_bag_name, rosbag::bagmode::Read);
+  }
+  catch (rosbag::BagException)
+  {
+    ROS_FATAL_STREAM("Cannot open " << pose_bag_name);
+    exit(-1);
+  }
   rosbag::View data_view(bag, rosbag::TopicQuery("calibration_joint_states"));
 
   std::vector<sensor_msgs::JointState> poses;
