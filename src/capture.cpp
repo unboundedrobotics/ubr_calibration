@@ -29,7 +29,7 @@ int main(int argc, char **argv)
   if (!nh.getParam("robot_description", description_msg.data))
   {
     ROS_FATAL("robot_description not set!");
-    exit(-1);
+    return -1;
   }
   urdf_pub.publish(description_msg);
 
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   catch (rosbag::BagException)
   {
     ROS_FATAL_STREAM("Cannot open " << pose_bag_name);
-    exit(-1);
+    return -1;
   }
   rosbag::View data_view(bag, rosbag::TopicQuery("calibration_joint_states"));
 

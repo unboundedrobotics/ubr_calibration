@@ -47,9 +47,22 @@
 
 int main(int argc, char** argv)
 {
+  /* Take name of poses from command line if supplied */
+  std::string data_bag_name("calibration_data.bag");
+  if (argc > 1)
+    data_bag_name = argv[1];
+
   /* Load bagfile of calibration data. */
   rosbag::Bag bag_;
-  bag_.open("calibration_data.bag", rosbag::bagmode::Read);
+  try
+  {
+    bag_.open(data_bag_name, rosbag::bagmode::Read);
+  }
+  catch (rosbag::BagException)
+  {
+    ROS_FATAL_STREAM("Cannot open " << data_bag_name);
+    return -1;
+  }
 
   /* Get robot_description from bag file. */
   rosbag::View model_view_(bag_, rosbag::TopicQuery("robot_description"));
