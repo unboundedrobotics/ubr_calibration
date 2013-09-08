@@ -104,11 +104,17 @@ public:
     /* Houston, we have a problem.. */
     problem_ = new ceres::Problem();
 
+    /* Store errors for later */
+    std::vector<double> error_x;
+    std::vector<double> error_y;
+    std::vector<double> error_z;
+    std::vector<double> error_t;  // total
+
     /* For each observation: */
     for (size_t i = 0; i < data.size(); ++i)
     {
       if (progress_to_stdout)
-        std::cout << "Adding observation:" << i << std::endl;
+        std::cout << "\nAdding observation:" << i << std::endl;
 
       /* Get joint positions from message. */
       KDL::JntArray arm_positions = getChainPositionsFromMsg(arm_chain_, data[i].joint_states);
@@ -126,7 +132,7 @@ public:
       points_[(3*i)+1] = projected.p.y();
       points_[(3*i)+2] = projected.p.z();
       if (progress_to_stdout)
-        std::cout << "Initial estimate of point (via arm): " << projected.p.x() <<
+        std::cout << "Initial estimate of point (via arm):   " << projected.p.x() <<
                      "," << projected.p.y() << "," << projected.p.z() << std::endl;
 
       /* Create camera chain error block, project through to do a sanity check on reprojection */
@@ -136,21 +142,29 @@ public:
                                                observations_[(i*3)+1],
                                                observations_[(i*3)+2]);
       double reprojection[3];
+      if (progress_to_stdout)
+      {
+        camera_error->getEstimatedGlobal(0, &reprojection[0]);
+        std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
+                     "," << reprojection[1] << "," << reprojection[2] << std::endl;
+
+        double x = fabs(projected.p.x() - reprojection[0]);
+        double y = fabs(projected.p.y() - reprojection[1]);
+        double z = fabs(projected.p.z() - reprojection[2]);
+        error_x.push_back(x);
+        error_y.push_back(y);
+        error_z.push_back(z);
+        error_t.push_back(sqrt((x * x) + (y * y) + (z * z)));
+      }
       camera_error->getMeasurement(0, &reprojection[0]);
       if (progress_to_stdout)
-        std::cout << "Camera measurement:   " << reprojection[0] <<
+        std::cout << "Camera measurement:                    " << reprojection[0] <<
                      "," << reprojection[1] << "," << reprojection[2] << std::endl;
 
       camera_error->getExpected(0, &points_[(3*i)], &reprojection[0]);
       if (progress_to_stdout)
-        std::cout << "Reprojected estimate (via camera):   " << reprojection[0] <<
+        std::cout << "Reprojection estimate:                 " << reprojection[0] <<
                      "," << reprojection[1] << "," << reprojection[2] << std::endl;
-      if (progress_to_stdout)
-      {
-        camera_error->getEstimatedGlobal(0, &reprojection[0]);
-        std::cout << "Global estimate (via camera):   " << reprojection[0] <<
-                     "," << reprojection[1] << "," << reprojection[2] << std::endl;
-      }
 
       /* Create arm residual */
       ceres::CostFunction* cost_function = ChainError::Create<7>(arm_error);
@@ -175,6 +189,7 @@ public:
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = progress_to_stdout;
 
+    std::cout << "\nSolver output:" << std::endl;
     summary_ = new ceres::Solver::Summary();
     ceres::Solve(options, problem_, summary_);
 
@@ -183,7 +198,7 @@ public:
     {
       for (size_t i = 0; i < data.size(); ++i)
       {
-        std::cout << "Analyzing observation:" << i << std::endl;
+        std::cout << "\nAnalyzing observation:" << i << std::endl;
 
         /* Get joint positions from message. */
         KDL::JntArray arm_positions = getChainPositionsFromMsg(arm_chain_, data[i].joint_states);
@@ -192,9 +207,8 @@ public:
         /* Create arm chain error block again */
         ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
         KDL::Frame projected = arm_error->getChainFK(&free_params_[0]);
-        if (progress_to_stdout)
-          std::cout << "Final estimate of point (via arm): " << projected.p.x() <<
-                       "," << projected.p.y() << "," << projected.p.z() << std::endl;
+        std::cout << "Final estimate of point (via arm):    " << projected.p.x() <<
+                     "," << projected.p.y() << "," << projected.p.z() << std::endl;
 
         /* Create camera chain error block again */
         RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
@@ -204,14 +218,18 @@ public:
                                                  observations_[(i*3)+2]);
         double reprojection[3];
         camera_error->getEstimatedGlobal(&free_params_[7], &reprojection[0]);
-        std::cout << "Global estimate (via camera):   " << reprojection[0] <<
+        std::cout << "Final estimate of point (via camera): " << reprojection[0] <<
                      "," << reprojection[1] << "," << reprojection[2] << std::endl;
 
-        double error_x = fabs(projected.p.x() - reprojection[0]);
-        double error_y = fabs(projected.p.y() - reprojection[1]);
-        double error_z = fabs(projected.p.z() - reprojection[2]);
-        double total = sqrt((error_x * error_x) + (error_y * error_y) + (error_z * error_z));
-        std::cout << "Error terms = x:" << error_x << " y:" << error_y << " z:" << error_z << " total:" << total << std::endl;
+        double x = fabs(projected.p.x() - reprojection[0]);
+        double y = fabs(projected.p.y() - reprojection[1]);
+        double z = fabs(projected.p.z() - reprojection[2]);
+        double t = sqrt((x * x) + (y * y) + (z * z));
+
+        std::cout << "Error\n      x: " << x << "\t(was " << ((double)error_x[i]) << ")" <<
+                          "\n      y: " << y << "\t(was " << ((double)error_y[i]) << ")" <<
+                          "\n      z: " << z << "\t(was " << ((double)error_z[i]) << ")" <<
+                          "\n  total: " << t << "\t(was " << ((double)error_t[i]) << ")" << std::endl;
       }
     }
 
@@ -221,6 +239,9 @@ public:
   /** \brief Debugging information output. */
   void printResult()
   {
+    /* Newline before results */
+    std::cout << std::endl;
+
     /* Print final estimates of points */
     for (int i = 0; i < num_observations_; ++i)
     {
