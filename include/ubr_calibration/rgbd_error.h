@@ -68,8 +68,8 @@ struct RgbdError
     getExpected(free_params, point, &expected[0]);
     getMeasurement(free_params, &measurement[0]);
 
-    residuals[0] = expected[0] - measurement[0];
-    residuals[1] = expected[1] - measurement[1];
+    residuals[0] = (expected[0] - measurement[0])*3.0;
+    residuals[1] = (expected[1] - measurement[1])*3.0;
     residuals[2] = expected[2] - measurement[2];
     return true;  // always return true
   }
@@ -108,6 +108,28 @@ struct RgbdError
     measurement[0] = observation_[0];
     measurement[1] = observation_[1];
     measurement[2] = observation_[2];
+  }
+
+  /**
+   *  \brief Used in analysis at end of program, find the position of
+   *         the observed point in the root frame.
+   */
+  inline void getEstimatedGlobal(const double* const free_params,
+                                 double* estimate)
+  {
+    KDL::Frame point_ = KDL::Frame::Identity();
+    point_.p.x(observation_[0]);
+    point_.p.y(observation_[1]);
+    point_.p.z(observation_[2]);
+
+    /* Compute FK through the chain. */
+    KDL::Frame p_out = chain_.getChainFK(free_params);
+
+    /* Transform point_ from camera_frame_ into root_frame_ and return it. */
+    point_ = p_out * point_;
+    estimate[0] = point_.p.x();
+    estimate[1] = point_.p.y();
+    estimate[2] = point_.p.z();
   }
 
   /** \brief Helper factory function to create a rgbd error block.

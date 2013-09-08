@@ -145,6 +145,12 @@ public:
       if (progress_to_stdout)
         std::cout << "Reprojected estimate (via camera):   " << reprojection[0] <<
                      "," << reprojection[1] << "," << reprojection[2] << std::endl;
+      if (progress_to_stdout)
+      {
+        camera_error->getEstimatedGlobal(0, &reprojection[0]);
+        std::cout << "Global estimate (via camera):   " << reprojection[0] <<
+                     "," << reprojection[1] << "," << reprojection[2] << std::endl;
+      }
 
       /* Create arm residual */
       ceres::CostFunction* cost_function = ChainError::Create<7>(arm_error);
@@ -171,6 +177,44 @@ public:
 
     summary_ = new ceres::Solver::Summary();
     ceres::Solve(options, problem_, summary_);
+
+    /* For each observation: */
+    if (progress_to_stdout)
+    {
+      for (size_t i = 0; i < data.size(); ++i)
+      {
+        std::cout << "Analyzing observation:" << i << std::endl;
+
+        /* Get joint positions from message. */
+        KDL::JntArray arm_positions = getChainPositionsFromMsg(arm_chain_, data[i].joint_states);
+        KDL::JntArray camera_positions = getChainPositionsFromMsg(camera_chain_, data[i].joint_states);
+
+        /* Create arm chain error block again */
+        ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
+        KDL::Frame projected = arm_error->getChainFK(&free_params_[0]);
+        if (progress_to_stdout)
+          std::cout << "Final estimate of point (via arm): " << projected.p.x() <<
+                       "," << projected.p.y() << "," << projected.p.z() << std::endl;
+
+        /* Create camera chain error block again */
+        RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
+                                                 root_frame_, data[i].rgbd_observations[0].header.frame_id,
+                                                 observations_[(i*3)+0],
+                                                 observations_[(i*3)+1],
+                                                 observations_[(i*3)+2]);
+        double reprojection[3];
+        camera_error->getEstimatedGlobal(&free_params_[7], &reprojection[0]);
+        std::cout << "Global estimate (via camera):   " << reprojection[0] <<
+                     "," << reprojection[1] << "," << reprojection[2] << std::endl;
+
+        double error_x = fabs(projected.p.x() - reprojection[0]);
+        double error_y = fabs(projected.p.y() - reprojection[1]);
+        double error_z = fabs(projected.p.z() - reprojection[2]);
+        double total = sqrt((error_x * error_x) + (error_y * error_y) + (error_z * error_z));
+        std::cout << "Error terms = x:" << error_x << " y:" << error_y << " z:" << error_z << " total:" << total << std::endl;
+      }
+    }
+
     return 0;
   }
 
