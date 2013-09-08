@@ -8,7 +8,6 @@
 
 #include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
-#include <kdl/chainfksolverpos_recursive.hpp>
 
 #include <ceres/ceres.h>
 
@@ -99,11 +98,20 @@ struct ChainError
         pos(i) = positions_(i);
 
     /* FK through chain. */
-    KDL::ChainFkSolverPos_recursive fk(chain_);
-    KDL::Frame p_out;
-    if (fk.JntToCart(pos, p_out) < 0)
+    KDL::Frame p_out = KDL::Frame::Identity();
+    int joint = 0;
+    for (int i = 0; i < chain_.getNrOfSegments(); ++i)
     {
-      // TODO: how to handle error?
+      if (chain_.getSegment(i).getJoint().getType() != KDL::Joint::None)
+      {
+        //std::cout << "applying joint " << chain_.getSegment(i).getName() << std::endl;
+        p_out = p_out * chain_.getSegment(i).pose(pos(joint));
+        ++joint;
+      }
+      else
+      {
+        p_out = p_out * chain_.getSegment(i).pose(0.0);
+      }
     }
 
     return p_out;
