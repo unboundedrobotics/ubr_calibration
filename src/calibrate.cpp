@@ -40,7 +40,7 @@
  *     -# load urdf, samples from bag file.
  *     -# create pile of 3d points by projecting through arm. Create
  *        joint angles, camera pose initial values.
- *     -# create residual blocks. (might evolve some still)
+ *     -# create residual blocks.
  *     -# run calibration.
  *     -# write results to URDF.
  */

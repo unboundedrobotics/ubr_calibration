@@ -26,7 +26,7 @@ std::string updateURDF(const std::string &urdf, std::map<std::string, double> &o
   {
     const char * name = joint_xml->Attribute("name");
 
-    /* Is there a calibration needed? */
+    /* Is there a joint calibration needed? */
     std::map<std::string, double>::iterator it = offsets.find(std::string(name));
     if (it != offsets.end())
     {
@@ -63,133 +63,129 @@ std::string updateURDF(const std::string &urdf, std::map<std::string, double> &o
         joint_xml->InsertEndChild(*calibration);
       }
     }
-  }
-
-  /* Update each link */
-  for (TiXmlElement* link_xml = robot_xml->FirstChildElement("link"); link_xml; link_xml = link_xml->NextSiblingElement("link"))
-  {
-    const char * name = link_xml->Attribute("name");
-
-    /* These consitute our origin. */
-    std::vector<double> xyz(3, 0.0);
-    std::vector<double> rpy(3, 0.0);
-
-    /* Parse out if we have any updates */
-    bool has_updates = false;
-    std::map<std::string, double>::iterator it = offsets.find(std::string(name).append("_x"));
-    if (it != offsets.end())
+    else  /* Is this a calibrated fixed joint? */
     {
-      xyz[0] = it->second;
-      has_updates = true;
-    }
-    it = offsets.find(std::string(name).append("_y"));
-    if (it != offsets.end())
-    {
-      xyz[1] = it->second;
-      has_updates = true;
-    }
-    it = offsets.find(std::string(name).append("_z"));
-    if (it != offsets.end())
-    {
-      xyz[2] = it->second;
-      has_updates = true;
-    }
-    it = offsets.find(std::string(name).append("_rot_r"));
-    if (it != offsets.end())
-    {
-      rpy[0] = it->second;
-      has_updates = true;
-    }
-    it = offsets.find(std::string(name).append("_rot_p"));
-    if (it != offsets.end())
-    {
-      rpy[1] = it->second;
-      has_updates = true;
-    }
-    it = offsets.find(std::string(name).append("_rot_y"));
-    if (it != offsets.end())
-    {
-      rpy[2] = it->second;
-      has_updates = true;
-    }
+      /* These consitute our origin. */
+      std::vector<double> xyz(3, 0.0);
+      std::vector<double> rpy(3, 0.0);
 
-    if (!has_updates)
-      continue;
-
-    TiXmlElement *origin_xml = link_xml->FirstChildElement("origin");
-    if (origin_xml)
-    {
-      /* Update existing origin. */
-      const char * xyz_str = origin_xml->Attribute("xyz");
-      const char * rpy_str = origin_xml->Attribute("rpy");
-
-      /* Split out xyz of origin, break into 3 strings. */
-      std::vector<std::string> xyz_pieces;
-      boost::split(xyz_pieces, xyz_str, boost::is_any_of(" "));
-
-      if (xyz_pieces.size() == 3)
+      /* Parse out if we have any updates */
+      bool has_updates = false;
+      std::map<std::string, double>::iterator it = offsets.find(std::string(name).append("_x"));
+      if (it != offsets.end())
       {
-        /* Merge xyz */
-        for (int i = 0; i < 3; ++i)
+        xyz[0] = it->second;
+        has_updates = true;
+      }
+      it = offsets.find(std::string(name).append("_y"));
+      if (it != offsets.end())
+      {
+        xyz[1] = it->second;
+        has_updates = true;
+      }
+      it = offsets.find(std::string(name).append("_z"));
+      if (it != offsets.end())
+      {
+        xyz[2] = it->second;
+        has_updates = true;
+      }
+      it = offsets.find(std::string(name).append("_roll"));
+      if (it != offsets.end())
+      {
+        rpy[0] = it->second;
+        has_updates = true;
+      }
+      it = offsets.find(std::string(name).append("_pitch"));
+      if (it != offsets.end())
+      {
+        rpy[1] = it->second;
+        has_updates = true;
+      }
+      it = offsets.find(std::string(name).append("_yaw"));
+      if (it != offsets.end())
+      {
+        rpy[2] = it->second;
+        has_updates = true;
+      }
+
+      if (has_updates)
+      {
+        TiXmlElement *origin_xml = joint_xml->FirstChildElement("origin");
+        if (origin_xml)
         {
-          double x = double(boost::lexical_cast<double>(xyz_pieces[i]) + xyz[i]);
-          xyz_pieces[i] = boost::lexical_cast<std::string>(x);
+          /* Update existing origin. */
+          const char * xyz_str = origin_xml->Attribute("xyz");
+          const char * rpy_str = origin_xml->Attribute("rpy");
+
+          /* Split out xyz of origin, break into 3 strings. */
+          std::vector<std::string> xyz_pieces;
+          boost::split(xyz_pieces, xyz_str, boost::is_any_of(" "));
+
+          if (xyz_pieces.size() == 3)
+          {
+            /* Merge xyz */
+            for (int i = 0; i < 3; ++i)
+            {
+              double x = double(boost::lexical_cast<double>(xyz_pieces[i]) + xyz[i]);
+              xyz_pieces[i] = boost::lexical_cast<std::string>(x);
+            }
+          }
+          else
+          {
+            /* Create xyz */
+            xyz_pieces.resize(3);
+            xyz_pieces[0] = boost::lexical_cast<std::string>(xyz[0]);
+            xyz_pieces[1] = boost::lexical_cast<std::string>(xyz[1]);
+            xyz_pieces[2] = boost::lexical_cast<std::string>(xyz[2]);
+          }
+
+          /* Split out rpy of origin, break into 3 strings. */
+          std::vector<std::string> rpy_pieces;
+          boost::split(rpy_pieces, rpy_str, boost::is_any_of(" "));
+
+          if (rpy_pieces.size() == 3)
+          {
+            /* Merge rpy */
+            for (int i = 0; i < 3; ++i)
+            {
+              double x = double(boost::lexical_cast<double>(rpy_pieces[i]) + rpy[i]);
+              rpy_pieces[i] = boost::lexical_cast<std::string>(x);
+            }
+          }
+          else
+          {
+            /* Create rpy */
+            rpy_pieces.resize(3);
+            rpy_pieces[0] = boost::lexical_cast<std::string>(rpy[0]);
+            rpy_pieces[1] = boost::lexical_cast<std::string>(rpy[1]);
+            rpy_pieces[2] = boost::lexical_cast<std::string>(rpy[2]);
+          }
+
+          /* Update xml */
+          origin_xml->SetAttribute("xyz", boost::join(xyz_pieces, " "));
+          origin_xml->SetAttribute("rpy", boost::join(rpy_pieces, " "));
+        }
+        else
+        {
+          /* No existing origin, create an element with attributes. */
+          origin_xml = new TiXmlElement("origin");
+
+          std::vector<std::string> xyz_pieces(3);
+          xyz_pieces[0] = boost::lexical_cast<std::string>(xyz[0]);
+          xyz_pieces[1] = boost::lexical_cast<std::string>(xyz[1]);
+          xyz_pieces[2] = boost::lexical_cast<std::string>(xyz[2]);
+          origin_xml->SetAttribute("xyz", boost::join(xyz_pieces, " "));
+
+          std::vector<std::string> rpy_pieces(3);
+          rpy_pieces[0] = boost::lexical_cast<std::string>(rpy[0]);
+          rpy_pieces[1] = boost::lexical_cast<std::string>(rpy[1]);
+          rpy_pieces[2] = boost::lexical_cast<std::string>(rpy[2]);
+          origin_xml->SetAttribute("rpy", boost::join(rpy_pieces, " "));
+
+          TiXmlNode * origin = origin_xml->Clone();
+          joint_xml->InsertEndChild(*origin);
         }
       }
-      else
-      {
-        /* Create xyz */
-        xyz_pieces.resize(3);
-        xyz_pieces[0] = boost::lexical_cast<std::string>(xyz[0]);
-        xyz_pieces[1] = boost::lexical_cast<std::string>(xyz[1]);
-        xyz_pieces[2] = boost::lexical_cast<std::string>(xyz[2]);
-      }
-
-      /* Split out rpy of origin, break into 3 strings. */
-      std::vector<std::string> rpy_pieces;
-      boost::split(rpy_pieces, rpy_str, boost::is_any_of(" "));
-
-      if (rpy_pieces.size() == 3)
-      {
-        /* Merge rpy */
-        for (int i = 0; i < 3; ++i)
-        {
-          double x = double(boost::lexical_cast<double>(rpy_pieces[i]) + rpy[i]);
-          rpy_pieces[i] = boost::lexical_cast<std::string>(x);
-        }
-      }
-      else
-      {
-        /* Create rpy */
-        rpy_pieces.resize(3);
-        rpy_pieces[0] = boost::lexical_cast<std::string>(rpy[0]);
-        rpy_pieces[1] = boost::lexical_cast<std::string>(rpy[1]);
-        rpy_pieces[2] = boost::lexical_cast<std::string>(rpy[2]);
-      }
-
-      /* Update xml */
-      origin_xml->SetAttribute("xyz", boost::join(xyz_pieces, " "));
-      origin_xml->SetAttribute("rpy", boost::join(rpy_pieces, " "));
-    }
-    else
-    {
-      /* No existing origin, create an element with attributes. */
-      origin_xml = new TiXmlElement("origin");
-
-      std::vector<std::string> xyz_pieces(3);
-      xyz_pieces[0] = boost::lexical_cast<std::string>(xyz[0]);
-      xyz_pieces[1] = boost::lexical_cast<std::string>(xyz[1]);
-      xyz_pieces[2] = boost::lexical_cast<std::string>(xyz[2]);
-      origin_xml->SetAttribute("xyz", boost::join(xyz_pieces, " "));
-
-      std::vector<std::string> rpy_pieces(3);
-      rpy_pieces[0] = boost::lexical_cast<std::string>(rpy[0]);
-      rpy_pieces[1] = boost::lexical_cast<std::string>(rpy[1]);
-      rpy_pieces[2] = boost::lexical_cast<std::string>(rpy[2]);
-      origin_xml->SetAttribute("rpy", boost::join(rpy_pieces, " "));
-
-      TiXmlNode * origin = origin_xml->Clone();
-      link_xml->InsertEndChild(*origin);
     }
   }
 

@@ -60,4 +60,61 @@ KDL::Rotation rotation_from_axis_magnitude(const double x, const double y, const
                                    cos(magnitude/2.0));
 }
 
+/**
+ *  \brief Data structure for generalizing specification of calibration.
+ *         This maps free parameters to frame updates.
+ *
+ *  NOTE: If calibrating orientations, either 1 or 3 of the parameters should
+ *        be filled in, as an angle-axis parameterization with 1 of 3 values
+ *        locked to 0 does not mean what you want it to mean.
+ */
+struct FrameCalibrationData
+{
+  FrameCalibrationData (int x_, int y_, int z_, int roll_, int pitch_, int yaw_) :
+    x(x_), y(y_), z(z_), roll(roll_), pitch(pitch_), yaw(yaw_), idx(-1), calibrate(true)
+  {
+  }
+
+  explicit FrameCalibrationData (int idx_) :
+    x(-1), y(-1), z(-1), roll(-1), pitch(-1), yaw(-1), idx(idx_), calibrate(true)
+  {
+  }
+
+  FrameCalibrationData () : calibrate(false)
+  {
+  }
+
+  /*
+   * Will be stored in a std::map<std::string, boost::shared_ptr<FrameCalibrationInfo> >
+   * so there is no need to store name here.
+   */
+
+  /** \brief The index of the x offset parameter, -1 if not calibrating x */
+  int x;
+
+  /** \brief The index of the y offset parameter, -1 if not calibrating y */
+  int y;
+
+  /** \brief The index of the z offset parameter, -1 if not calibrating z */
+  int z;
+
+  /** \brief The index of the roll offset parameter, -1 if not calibrating roll */
+  int roll;
+
+  /** \brief The index of the pitch offset parameter, -1 if not calibrating pitch */
+  int pitch;
+
+  /** \brief The index of the yaw offset parameter, -1 if not calibrating yaw */
+  int yaw;
+
+  /** \brief The index of the joint, if this is an active joint */
+  int idx;
+
+  /** \brief Should we calibrate this? */
+  bool calibrate;
+};
+
+typedef std::map<std::string, FrameCalibrationData> FrameCalibrationInfo;
+typedef std::map<std::string, FrameCalibrationData>::iterator FrameCalibrationInfoIterator;
+
 #endif  // UBR_CALIBRATION_CHAIN_FUNCTIONS_H_

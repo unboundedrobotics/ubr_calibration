@@ -32,16 +32,21 @@ struct RgbdError
    *  given by the combined magnitude of the 3 parameters).
    *
    *  \param chain The KDL chain for the robot.
+   *  \param positions The position of the joints when this measurement was taken.
+   *  \param info The frame calibration info.
+   *  \param offset The offset applied to this block, which must be subtracted from indexes in info.
    *  \param root The name of the root link (typically 'base_link')
    *  \param tip The name of the sensor frame.
    *  \param positions The position of the joints when this measurement was taken.
-   *  \param observed_x The observed x coordinate of the point, when chain is the arm, this is 0.
-   *  \param observed_y The observed y coordinate of the point, when chain is the arm, this is 0.
-   *  \param observed_z The observed z coordinate of the point, when chain is the arm, this is 0.
+   *  \param observed_x The observed x coordinate of the point.
+   *  \param observed_y The observed y coordinate of the point.
+   *  \param observed_z The observed z coordinate of the point.
    */
-  RgbdError(KDL::Chain& chain, KDL::JntArray& positions, std::string root, std::string tip,
-             double observed_x, double observed_y, double observed_z)
-    : chain_(chain, positions, root, tip)
+  RgbdError(KDL::Chain& chain, KDL::JntArray& positions,
+            FrameCalibrationInfo* info, int offset,
+            std::string root, std::string tip,
+            double observed_x, double observed_y, double observed_z)
+    : chain_(chain, positions, info, offset, root, tip)
   {
     observation_[0] = observed_x;
     observation_[1] = observed_y;
@@ -86,22 +91,6 @@ struct RgbdError
     /* Compute FK through the chain. */
     KDL::Frame p_out = chain_.getChainFK(free_params);
 
-    /* Allow this to run without free_params being defined. */
-    if (free_params)
-    {
-      int param_idx = chain_.getNumOfParams();
-
-      /* Create camera 6-dof correction from free_params */
-      KDL::Frame camera_correction(KDL::Frame::Identity());
-      camera_correction.p.x(free_params[param_idx]);
-      camera_correction.p.y(free_params[param_idx+1]);
-      camera_correction.p.z(free_params[param_idx+2]);
-      camera_correction.M = rotation_from_axis_magnitude(free_params[param_idx+3],
-                                                         free_params[param_idx+4],
-                                                         free_params[param_idx+5]);
-      p_out = p_out*camera_correction;
-    }
-
     /* Transform point_ from root_frame_ into camera_frame_ and return it. */
     point_ = p_out.Inverse() * point_;
     expected[0] = point_.p.x();
@@ -127,6 +116,8 @@ struct RgbdError
   template <int num_free_params>
   static ceres::CostFunction* Create(KDL::Chain& chain,
                                      KDL::JntArray& positions,
+                                     FrameCalibrationInfo* info,
+                                     int offset,
                                      std::string root,
                                      std::string tip,
                                      double x,
@@ -135,7 +126,7 @@ struct RgbdError
   {
     /* See ChainError::Create for what these params are. */
     return ( new ceres::NumericDiffCostFunction<RgbdError, ceres::CENTRAL, 3, num_free_params, 3>(
-                 new RgbdError(chain, positions, root, tip, x, y, z)));
+                 new RgbdError(chain, positions, info, offset, root, tip, x, y, z)));
   }
 
   /** \brief Helper factory function to create a rgbd error block from existing RgbdError. */

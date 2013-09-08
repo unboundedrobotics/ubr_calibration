@@ -21,7 +21,7 @@ std::string robot_description =
 "  </joint>"
 "  <link name='link_2'/>"
 "  <joint name='third_joint' type='fixed'>"
-"    <origin rpy='0 -1.57 0' xyz='0 0 0.0526'/>"
+"    <origin rpy='0 -1.5 0' xyz='0 0 0.0526'/>"
 "    <parent link='link_2'/>"
 "    <child link='link_3'/>"
 "  </joint>"
@@ -48,13 +48,11 @@ std::string robot_description_updated =
 "  </joint>\n"
 "  <link name=\"link_2\" />\n"
 "  <joint name=\"third_joint\" type=\"fixed\">\n"
-"    <origin rpy=\"0 -1.57 0\" xyz=\"0 0 0.0526\" />\n"
+"    <origin rpy=\"4 3.5 6\" xyz=\"1 2 3.0526\" />\n"
 "    <parent link=\"link_2\" />\n"
 "    <child link=\"link_3\" />\n"
 "  </joint>\n"
-"  <link name=\"link_3\">\n"
-"    <origin xyz=\"1 2 3\" rpy=\"4 5 6\" />\n"
-"  </link>\n"
+"  <link name=\"link_3\" />\n"
 "</robot>";
 
 TEST(UpdateUrdfTest, test_urdf_update)
@@ -63,12 +61,12 @@ TEST(UpdateUrdfTest, test_urdf_update)
 
   offsets["second_joint"] = 0.245;  // should add a rising
   
-  offsets["link_3_x"] = 1;  // camera-like offset
-  offsets["link_3_y"] = 2;
-  offsets["link_3_z"] = 3;
-  offsets["link_3_rot_r"] = 4;
-  offsets["link_3_rot_p"] = 5;
-  offsets["link_3_rot_y"] = 6;
+  offsets["third_joint_x"] = 1;  // camera-like offset
+  offsets["third_joint_y"] = 2;
+  offsets["third_joint_z"] = 3;
+  offsets["third_joint_roll"] = 4;
+  offsets["third_joint_pitch"] = 5;
+  offsets["third_joint_yaw"] = 6;
 
   std::string s = updateURDF(robot_description, offsets);
   

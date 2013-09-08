@@ -16,6 +16,10 @@
 #include <ubr_calibration/rgbd_error.h>
 #include <ubr_calibration/chain_functions.h>
 
+#include <boost/shared_ptr.hpp>
+#include <string>
+#include <map>
+
 /** \brief Class to do optimization. */
 class Optimizer
 {
@@ -73,8 +77,26 @@ public:
     observations_ = new double[3 * num_observations_];
     points_ = new double[3 * num_observations_];
 
-    /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [camera pose offset] = ALL 0 */
-    num_free_params_ = arm_chain_.getNrOfJoints() + camera_chain_.getNrOfJoints() + 6;
+    /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] */
+    num_free_params_ = 0; //arm_chain_.getNrOfJoints() + camera_chain_.getNrOfJoints();
+
+    /* TODO: in the future, parse this from a yaml or something */
+    /* Although we set aside a free parameter for each arm/camera joint, we may not want to calibrate each */
+    adjustments_["torso_lift_joint"] = FrameCalibrationData();
+    adjustments_["shoulder_pan_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["shoulder_lift_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["upperarm_roll_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["elbow_flex_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["forearm_roll_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["wrist_flex_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["wrist_roll_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["head_pan_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["head_tilt_joint"] = FrameCalibrationData(num_free_params_++);
+    adjustments_["head_camera_rgb_joint"] =
+      FrameCalibrationData(num_free_params_++, num_free_params_++, num_free_params_++, -1, -1, num_free_params_++);
+    adjustments_["head_camera_rgb_optical_joint"] = FrameCalibrationData(-1, -1, -1, -1, -1, num_free_params_++);
+
+    /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] = ALL 0 */
     free_params_ = new double[num_free_params_];
     for (int i = 0; i < num_free_params_; ++i)
       free_params_[i] = 0.0;
@@ -98,7 +120,7 @@ public:
       observations_[(3*i)+2] = data[i].rgbd_observations[0].point.z;
 
       /* Create arm chain error block, project through arm to get initial points[i] */
-      ChainError * arm_error = new ChainError(arm_chain_, arm_positions, root_frame_, led_frame_);
+      ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
       KDL::Frame projected = arm_error->getChainFK(0);
       points_[(3*i)+0] = projected.p.x();
       points_[(3*i)+1] = projected.p.y();
@@ -108,7 +130,7 @@ public:
                      "," << projected.p.y() << "," << projected.p.z() << std::endl;
 
       /* Create camera chain error block, project through to do a sanity check on reprojection */
-      RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions,
+      RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
                                                root_frame_, data[i].rgbd_observations[0].header.frame_id,
                                                observations_[(i*3)+0],
                                                observations_[(i*3)+1],
@@ -128,14 +150,14 @@ public:
       ceres::CostFunction* cost_function = ChainError::Create<7>(arm_error);
       problem_->AddResidualBlock(cost_function,
                                  NULL /* squared loss */,
-                                 &free_params_[0],
+                                 &free_params_[adjustments_["shoulder_pan_joint"].idx],
                                  &points_[(3*i)]);
 
       /* Create camera residual */
-      cost_function = RgbdError::Create<8>(camera_error);
+      cost_function = RgbdError::Create<7>(camera_error);
       problem_->AddResidualBlock(cost_function,
                                  NULL /* squared loss */,
-                                 &free_params_[arm_chain_.getNrOfJoints()],
+                                 &free_params_[adjustments_["head_pan_joint"].idx],
                                  &points_[(3*i)]);
 
       /* Note: arm/camera error blocks will be managed by scoped_ptr in cost functor
@@ -158,13 +180,13 @@ public:
     /* Print final estimates of points */
     for (int i = 0; i < num_observations_; ++i)
     {
-      std::cout << "Final estimate: " << points_[(3*i)+0] << "," << 
-                                         points_[(3*i)+1] << "," << 
+      std::cout << "Final estimate: " << points_[(3*i)+0] << "," <<
+                                         points_[(3*i)+1] << "," <<
                                          points_[(3*i)+2] << std::endl;
     }
 
     /* Print final calibration updates */
-    std::cout << "Calibrated Params" << std::endl;
+    std::cout << "\nCalibrated Params" << std::endl;
     std::map<std::string, double> offsets = getCalibrationOffsets();
     for (std::map<std::string, double>::const_iterator it = offsets.begin();
          it != offsets.end(); ++it)
@@ -172,6 +194,8 @@ public:
       std::cout << it->first << ": " <<
                    it->second << std::endl;
     }
+
+    std::cout << "\n" << summary_->BriefReport() << std::endl;
   }
 
   /**
@@ -181,36 +205,68 @@ public:
   std::map<std::string, double> getCalibrationOffsets()
   {
     std::map<std::string, double> offsets;
-    int p = 0;
-    for (int i = 0; i < arm_chain_.getNrOfSegments(); ++i)
+    for (FrameCalibrationInfoIterator it = adjustments_.begin();
+         it != adjustments_.end();
+         ++it)
     {
-      if (arm_chain_.getSegment(i).getJoint().getType()!=KDL::Joint::None)
+      FrameCalibrationData d = it->second;
+      if (d.calibrate)
       {
-        offsets[arm_chain_.getSegment(i).getJoint().getName()] = free_params_[p];
-        ++p;
+        if (d.idx > -1)
+        {
+          /* This is a joint */
+          offsets[it->first] = free_params_[d.idx];
+        }
+        else
+        {
+          if (d.x > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_x")] = free_params_[d.x];
+          }
+          if (d.y > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_y")] = free_params_[d.y];
+          }
+          if (d.z > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_z")] = free_params_[d.z];
+          }
+          /* Angles are either all 3, or just one */
+          if ((d.roll > -1) && (d.pitch > -1) && (d.yaw > -1))
+          {
+            double roll, pitch, yaw;
+            /* Again, the d.X values are not actually roll/pitch/yaw */
+            KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[d.roll],
+                                                             free_params_[d.pitch],
+                                                             free_params_[d.yaw]);
+            std::string name = it->first;
+            offsets[name.append("_roll")] = roll;
+            name = it->first;
+            offsets[name.append("_pitch")] = pitch;
+            name = it->first;
+            offsets[name.append("_yaw")] = yaw;
+          }
+          else if (d.roll > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_roll")] = free_params_[d.roll];
+          }
+          else if (d.pitch > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_pitch")] = free_params_[d.pitch];
+          }
+          else if (d.yaw > -1)
+          {
+            std::string name = it->first;
+            offsets[name.append("_yaw")] = free_params_[d.yaw];
+          }
+        }
       }
     }
-    for (int i = 0; i < camera_chain_.getNrOfSegments(); ++i)
-    {
-      if (camera_chain_.getSegment(i).getJoint().getType()!=KDL::Joint::None)
-      {
-        offsets[camera_chain_.getSegment(i).getJoint().getName()] = free_params_[p];
-        ++p;
-      }
-    }
-    // TODO: make this generic
-    offsets["head_camera_frame_x"] = free_params_[p++];
-    offsets["head_camera_frame_y"] = free_params_[p++];
-    offsets["head_camera_frame_z"] = free_params_[p++];
-    /* Convert Angle-Axis to RPY */
-    double roll, pitch, yaw;
-    KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[p++],
-                                                     free_params_[p++],
-                                                     free_params_[p++]);
-    rot.GetRPY(roll, pitch, yaw);
-    offsets["head_camera_frame_rot_r"] = roll;
-    offsets["head_camera_frame_rot_p"] = pitch;
-    offsets["head_camera_frame_rot_y"] = yaw;
     return offsets;
   }
 
@@ -234,6 +290,7 @@ private:
   double * observations_;
   double * points_;
   double * free_params_;
+  FrameCalibrationInfo adjustments_;
 
   ceres::Problem* problem_;
   ceres::Solver::Summary* summary_;

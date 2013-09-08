@@ -9,6 +9,8 @@
 #include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
 
+#include <ubr_calibration/chain_functions.h>
+
 #include <ceres/ceres.h>
 
 #include <string>
@@ -25,12 +27,16 @@ struct ChainError
    *  \brief Standard construct for a residual block based on projection through a chain.
    *  \param chain The KDL chain for the robot.
    *  \param positions The position of the joints when this measurement was taken.
+   *  \param info The frame calibration info.
+   *  \param offset The offset applied to this block, which must be subtracted from indexes in info.
    *  \param root The name of the root link (typically 'base_link')
    *  \param tip The name of the tip of the chain to be used (typically the camera sensor frame
    *         or gripper LED frame).
    */
-  ChainError(KDL::Chain& chain, KDL::JntArray& positions, std::string root, std::string tip) : 
-    chain_(chain), positions_(positions), root_(root), tip_(tip)
+  ChainError(KDL::Chain& chain, KDL::JntArray& positions,
+             FrameCalibrationInfo* info, int offset,
+             std::string root, std::string tip) :
+    chain_(chain), positions_(positions), info_(info), offset_(offset), root_(root), tip_(tip)
   {
   }
 
@@ -85,43 +91,74 @@ struct ChainError
   /** \brief Get the pose of the chain, given a set of parameters */
   inline KDL::Frame getChainFK(const double* const free_params) const
   {
-    /* Create a temporary JntArray, update it with the joint offsets from free_params. */
-    int chain_len = chain_.getNrOfJoints();
-    KDL::JntArray pos(chain_len);
-
-    /* Allow this to run without free_params being defined */
-    if (free_params)
-      for (int i = 0; i < chain_len; ++i)
-        pos(i) = positions_(i) + static_cast<double>(free_params[i]);
-    else
-      for (int i = 0; i < chain_len; ++i)
-        pos(i) = positions_(i);
-
     /* FK through chain. */
     KDL::Frame p_out = KDL::Frame::Identity();
     int joint = 0;
     for (int i = 0; i < chain_.getNrOfSegments(); ++i)
     {
+      std::string name = chain_.getSegment(i).getJoint().getName();
+      FrameCalibrationData d = (*info_)[name];
+
       if (chain_.getSegment(i).getJoint().getType() != KDL::Joint::None)
       {
-        //std::cout << "applying joint " << chain_.getSegment(i).getName() << std::endl;
-        p_out = p_out * chain_.getSegment(i).pose(pos(joint));
+        if (d.calibrate && free_params)
+          p_out = p_out * chain_.getSegment(i).pose(positions_(joint) + static_cast<double>(free_params[d.idx-offset_]));
+        else
+          p_out = p_out * chain_.getSegment(i).pose(positions_(joint));
         ++joint;
       }
       else
       {
-        p_out = p_out * chain_.getSegment(i).pose(0.0);
+        /* Does this frame get calibrated? */
+        if (d.calibrate)
+        {
+          KDL::Frame correction(KDL::Frame::Identity());
+          if (free_params)
+          {
+            /* Create 6-dof correction from free_params */
+            if (d.x > -1)
+              correction.p.x(free_params[d.x-offset_]);
+            if (d.y > -1)
+              correction.p.y(free_params[d.y-offset_]);
+            if (d.z > -1)
+              correction.p.z(free_params[d.z-offset_]);
+
+            /* Orientation is either 0, 1 or 3 parameters */
+            if ( (d.roll > -1) &&
+                 (d.pitch > -1) &&
+                 (d.yaw > -1) )
+            {
+               /* These don't really correspond to rpy -- but call them that anyways */
+               correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
+                                                           free_params[d.pitch-offset_],
+                                                           free_params[d.yaw-offset_]);
+            }
+            else if (d.roll > -1)
+            {
+               correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
+                                                           0,
+                                                           0);
+            }
+            else if (d.pitch > -1)
+            {
+               correction.M = rotation_from_axis_magnitude(0,
+                                                           free_params[d.pitch-offset_],
+                                                           0);
+            }
+            else if (d.yaw > -1)
+            {
+               correction.M = rotation_from_axis_magnitude(0,
+                                                           0,
+                                                           free_params[d.yaw-offset_]);
+            }
+          }
+          p_out = (p_out * correction) * chain_.getSegment(i).pose(0.0);
+        }
+        else
+          p_out = p_out * chain_.getSegment(i).pose(0.0);
       }
     }
-
     return p_out;
-  }
-
-  /** \brief Get the number of parameters needed by this chain. */
-  int getNumOfParams() const
-  {
-    // TODO: this will change when we do more complex parameter block manipulation.
-    return chain_.getNrOfJoints();
   }
 
   /**
@@ -131,6 +168,8 @@ struct ChainError
   template <int num_free_params>
   static ceres::CostFunction* Create(KDL::Chain& chain,
                                      KDL::JntArray& positions,
+                                     FrameCalibrationInfo* info,
+                                     int offset,
                                      std::string root,
                                      std::string tip)
   {
@@ -142,7 +181,7 @@ struct ChainError
      * is the same size as the number of joints. The third parameter is the size of our point.
      */
     return ( new ceres::NumericDiffCostFunction<ChainError, ceres::CENTRAL, 3, num_free_params, 3>(
-                 new ChainError(chain, positions, root, tip)));
+                 new ChainError(chain, positions, info, offset, root, tip)));
   }
 
   /** \brief Helper factory function to create a chain error block from existing ChainError. */
@@ -155,6 +194,8 @@ struct ChainError
   /* stored data */
   KDL::Chain chain_;
   KDL::JntArray positions_;
+  FrameCalibrationInfo * info_;
+  int offset_;
   std::string root_;
   std::string tip_;
 };
