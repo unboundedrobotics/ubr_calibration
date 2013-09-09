@@ -29,6 +29,7 @@ ChainManager::makePoint(const sensor_msgs::JointState& state, const std::vector<
         break;
       }
     p.velocities.push_back(0.0);
+    p.accelerations.push_back(0.0);
     if (p.velocities.size() != p.positions.size())
     {
       ROS_ERROR_STREAM("Bad move to state, missing " << joints[i]);
@@ -45,7 +46,7 @@ bool ChainManager::moveToState(const sensor_msgs::JointState& state)
   head_goal.trajectory.joint_names = head_joints_;
 
   trajectory_msgs::JointTrajectoryPoint p = makePoint(state, head_joints_);
-  p.time_from_start = ros::Duration(10.0);
+  p.time_from_start = ros::Duration(1.0);
   head_goal.trajectory.points.push_back(p);
   head_goal.goal_time_tolerance = ros::Duration(1.0);
 
