@@ -109,7 +109,7 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
     }
 
     /* Color any points that are probably part of the LED with small red circles. */
-    for (size_t i = 0; i < cloud_ptr_->size(); i++)
+    for (size_t i = 0; i < cloud_ptr_->size(); ++i)
     {
       if (diff[i] > (threshold_ * 0.75))
       {
@@ -131,6 +131,44 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   point_stamped->point.x = cloud_ptr_->points[diff_max_idx].x;
   point_stamped->point.y = cloud_ptr_->points[diff_max_idx].y;
   point_stamped->point.z = cloud_ptr_->points[diff_max_idx].z;
+
+  /* Get a better centroid */
+  int centroid_points = 0;
+  double centroid_sum_x = 0.0;
+  double centroid_sum_y = 0.0;
+  double centroid_sum_z = 0.0;
+  for (size_t i = 0; i < cloud_ptr_->size(); ++i)
+  {
+    /* Using highly likely points */
+    if (diff[i] > (threshold_ * 0.75))
+    {
+      double dx = cloud_ptr_->points[i].x - point_stamped->point.x;
+      double dy = cloud_ptr_->points[i].y - point_stamped->point.y;
+      double dz = cloud_ptr_->points[i].z - point_stamped->point.z;
+
+      /* That are less than 1cm from the max point */
+      if ( (dx*dx) + (dy*dy) + (dz*dz) < 0.1 )
+      {
+        centroid_sum_x += cloud_ptr_->points[i].x;
+        centroid_sum_y += cloud_ptr_->points[i].y;
+        centroid_sum_z += cloud_ptr_->points[i].z;
+        ++centroid_points;
+      }
+    }
+  }
+
+  if (centroid_points == 0)
+  {
+    ROS_ERROR("No centroid found?");
+    return false;
+  }
+
+  /* Update from centroid */
+  point_stamped->point.x = centroid_sum_x/centroid_points;
+  point_stamped->point.y = centroid_sum_y/centroid_points;
+  point_stamped->point.z = centroid_sum_z/centroid_points;
+
+  /* Fill in the headers */
 #if PCL_VERSION_COMPARE(<,1,7,0)
   point_stamped->header = cloud_ptr_->header;
 #else
