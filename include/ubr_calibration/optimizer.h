@@ -82,7 +82,7 @@ public:
 
     /* TODO: in the future, parse this from a yaml or something */
     /* Although we set aside a free parameter for each arm/camera joint, we may not want to calibrate each */
-    adjustments_["torso_lift_joint"] = FrameCalibrationData();
+    adjustments_["torso_lift_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["shoulder_pan_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["shoulder_lift_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["upperarm_roll_joint"] = FrameCalibrationData(num_free_params_++);
@@ -95,6 +95,10 @@ public:
     adjustments_["head_camera_rgb_joint"] =
       FrameCalibrationData(num_free_params_++, num_free_params_++, num_free_params_++, -1, -1, num_free_params_++);
     adjustments_["head_camera_rgb_optical_joint"] = FrameCalibrationData(-1, -1, -1, -1, -1, num_free_params_++);
+
+    /* disable torso lift and wrist roll */
+    adjustments_["torso_lift_joint"].calibrate = false;
+    adjustments_["wrist_roll_joint"].calibrate = false;
 
     /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] = ALL 0 */
     free_params_ = new double[num_free_params_];
@@ -136,7 +140,7 @@ public:
                      "," << projected.p.y() << "," << projected.p.z() << std::endl;
 
       /* Create camera chain error block, project through to do a sanity check on reprojection */
-      RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
+      RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 8,
                                                root_frame_, data[i].rgbd_observations[0].header.frame_id,
                                                observations_[(i*3)+0],
                                                observations_[(i*3)+1],
@@ -167,10 +171,10 @@ public:
                      "," << reprojection[1] << "," << reprojection[2] << std::endl;
 
       /* Create arm residual */
-      ceres::CostFunction* cost_function = ChainError::Create<7>(arm_error);
+      ceres::CostFunction* cost_function = ChainError::Create<8>(arm_error);
       problem_->AddResidualBlock(cost_function,
                                  NULL /* squared loss */,
-                                 &free_params_[adjustments_["shoulder_pan_joint"].idx],
+                                 &free_params_[adjustments_["torso_lift_joint"].idx],
                                  &points_[(3*i)]);
 
       /* Create camera residual */
