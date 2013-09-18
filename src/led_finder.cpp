@@ -9,9 +9,9 @@ void LedFinder::cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr clou
 {
   if (waiting_)
   {
-    cloud_ptr_ = cloud;  
+    cloud_ptr_ = cloud;
     waiting_ = false;
-  }  
+  }
 }
 
 /* Returns true if we got a message, false if we timeout. */
@@ -30,7 +30,6 @@ bool LedFinder::waitForCloud()
 /*
  * TODO: Future Improvements
  *  Accuracy might be improved by finding a plane around the gripper LED.
- *  Actually finding the real centroid of the max diff region may also improve calibration.
  */
 bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
 {
@@ -213,4 +212,103 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
 
   /* We found a point. */
   return true;
+}
+
+bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points)
+{
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr prev_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+
+  /* Get cloud */
+  if(!waitForCloud())
+    return false;
+
+  /* 6 potential points */
+  double x[] = {0.5, 0.5, 1.0, 1.0, 2.0, 2.0};
+  double y[] = {-0.25, 0.25, -0.5, 0.5, -0.75, 0.75};
+  std::vector<double> dist(6, 0.1);
+  std::vector<int> idx(6,-1);
+  int found = 0;  // how many points have we found
+
+  /* For each point, see if it close to a potential point */
+  for (size_t i = 0; i < cloud_ptr_->size(); ++i)
+  {
+    /* No nans */
+    if (isnan(cloud_ptr_->points[i].x) ||
+        isnan(cloud_ptr_->points[i].y) ||
+        isnan(cloud_ptr_->points[i].z))
+      continue;
+
+    /* Transform point to base frame */
+    geometry_msgs::PointStamped p, p_base;
+    #if PCL_VERSION_COMPARE(<,1,7,0)
+    p.header = cloud_ptr_->header;
+    #else
+    p.header.seq = cloud_ptr_->header.seq;
+    p.header.frame_id = cloud_ptr_->header.frame_id;
+    p.header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
+    #endif
+    p.point.x = cloud_ptr_->points[i].x;
+    p.point.y = cloud_ptr_->points[i].y;
+    p.point.z = cloud_ptr_->points[i].z;
+    try
+    {
+      listener_.transformPoint("base_link", p, p_base);
+    }
+    catch(const tf::TransformException &ex)
+    {
+      ROS_ERROR("Failed to transform point to base_link");
+      continue;
+    }
+
+    /* Check against candidate points */
+    for (size_t j = 0; j < 6; ++j)
+    {
+      double dx = p_base.point.x - x[j];
+      double dy = p_base.point.y - y[j];
+      double dz = p_base.point.z ;
+
+      double d = (dx*dx) + (dy*dy) + (dz*dz);
+
+      if (d < dist[j])
+      {
+        dist[j] = d;
+        if (idx[j] == -1)
+          ++found;
+        idx[j] = i;
+      }
+    }
+  }
+
+  if (found >= 4)
+  {
+    points.resize(found);
+
+    int i = 0;
+    for (size_t j = 0; j < 6; ++j)
+    {
+      if (idx[j] == -1)
+        continue;
+      /* Fill in the headers */
+      #if PCL_VERSION_COMPARE(<,1,7,0)
+      points[i].header = cloud_ptr_->header;
+      #else
+      points[i].header.seq = cloud_ptr_->header.seq;
+      points[i].header.frame_id = cloud_ptr_->header.frame_id;
+      points[i].header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
+      #endif
+      points[i].point.x = cloud_ptr_->points[idx[j]].x;
+      points[i].point.y = cloud_ptr_->points[idx[j]].y;
+      points[i].point.z = cloud_ptr_->points[idx[j]].z;
+
+      /* Publish point. */
+      publisher_.publish(points[i]);
+
+      ++i;
+    }
+
+    return true;
+  }
+
+  /* Not enough points found */
+  return false;
 }

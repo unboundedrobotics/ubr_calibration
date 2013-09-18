@@ -68,6 +68,68 @@ int main(int argc, char **argv)
   ros::AsyncSpinner spinner(1);
   spinner.start();
 
+  /* Setup pose with arm out to side, head forward */
+  sensor_msgs::JointState js;
+  js.name.push_back("elbow_flex_joint");
+  js.name.push_back("forearm_roll_joint");
+  js.name.push_back("head_pan_joint");
+  js.name.push_back("shoulder_lift_joint");
+  js.name.push_back("shoulder_pan_joint");
+  js.name.push_back("upperarm_roll_joint");
+  js.name.push_back("wrist_flex_joint");
+  js.name.push_back("wrist_roll_joint");
+  js.name.push_back("head_tilt_joint");
+  js.position.push_back(1.75);
+  js.position.push_back(0.0);
+  js.position.push_back(0.0);
+  js.position.push_back(-0.90);
+  js.position.push_back(-1.40);
+  js.position.push_back(0.0);
+  js.position.push_back(0.0);
+  js.position.push_back(0.0);
+  js.position.push_back(-0.55);
+
+  /* Get ground plane with head down close to base */
+  chain_manager_.moveToState(js);
+  chain_manager_.waitToSettle();
+  while (true)
+  {
+    ubr_calibration::CalibrationData msg;
+
+    /* Get pose of the ground plane */
+    if (!led_finder_.findGroundPlane(msg.rgbd_observations))
+    {
+      ROS_WARN("Failed to capture ground sample.");
+      continue;
+    }
+
+    /* Publish calibration data message. */
+    pub.publish(msg);
+
+    break;
+  }
+
+  /* Get ground plane with head more upright */
+  js.position[8] = -1.1;
+  chain_manager_.moveToState(js);
+  chain_manager_.waitToSettle();
+  while (true)
+  {
+    ubr_calibration::CalibrationData msg;
+
+    /* Get pose of the ground plane */
+    if (!led_finder_.findGroundPlane(msg.rgbd_observations))
+    {
+      ROS_WARN("Failed to capture ground sample.");
+      continue;
+    }
+
+    /* Publish calibration data message. */
+    pub.publish(msg);
+
+    break;
+  }
+
   /* For each pose in the capture sequence. */
   for (std::vector<sensor_msgs::JointState>::iterator it = poses.begin();
        (it != poses.end()) || (poses.size() == 0); ++it)

@@ -52,6 +52,13 @@ public:
    */
   bool findLed(geometry_msgs::PointStamped * point_stamped);
 
+  /**
+   * \brief Attempts to find the ground plane.
+   * \param points This will be filled in with ground plane points.
+   * \returns True if points have been filled in.
+   */
+  bool findGroundPlane(std::vector<geometry_msgs::PointStamped>& points);
+
 private:
   void cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
   bool waitForCloud();
