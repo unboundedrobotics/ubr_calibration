@@ -228,6 +228,13 @@ bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points
   std::vector<double> dist(6, 0.1);
   std::vector<int> idx(6,-1);
   int found = 0;  // how many points have we found
+  std::vector<std::string> point_names;
+  point_names.push_back("pt0");
+  point_names.push_back("pt1");
+  point_names.push_back("pt2");
+  point_names.push_back("pt3");
+  point_names.push_back("pt4");
+  point_names.push_back("pt5");
 
   /* For each point, see if it close to a potential point */
   for (size_t i = 0; i < cloud_ptr_->size(); ++i)
@@ -302,6 +309,9 @@ bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points
 
       /* Publish point. */
       publisher_.publish(points[i]);
+
+      /* Rename frame (this is a hack, maybe it should be cleaned up) */
+      points[i].header.frame_id = point_names[j];
 
       ++i;
     }
