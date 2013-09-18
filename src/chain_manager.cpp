@@ -48,13 +48,13 @@ bool ChainManager::moveToState(const sensor_msgs::JointState& state)
   trajectory_msgs::JointTrajectoryPoint p = makePoint(state, head_joints_);
   p.time_from_start = ros::Duration(1.0);
   head_goal.trajectory.points.push_back(p);
-  head_goal.goal_time_tolerance = ros::Duration(1.0);
+  head_goal.goal_time_tolerance = ros::Duration(3.0);
 
   control_msgs::FollowJointTrajectoryGoal arm_goal;
   arm_goal.trajectory.joint_names = arm_joints_;
 
   p = makePoint(state, arm_joints_);
-  p.time_from_start = ros::Duration(10.0);
+  p.time_from_start = ros::Duration(3.0);
   arm_goal.trajectory.points.push_back(p);
   arm_goal.goal_time_tolerance = ros::Duration(1.0);
 
