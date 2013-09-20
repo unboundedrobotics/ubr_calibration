@@ -272,7 +272,8 @@ bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points
     {
       double dx = p_base.point.x - x[j];
       double dy = p_base.point.y - y[j];
-      double dz = p_base.point.z ;
+      /* z-plane of base_link is 2.25" off real ground */
+      double dz = p_base.point.z - -0.05715;
 
       double d = (dx*dx) + (dy*dy) + (dz*dz);
 

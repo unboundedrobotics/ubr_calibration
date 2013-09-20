@@ -168,7 +168,8 @@ public:
             points_[(3*observation)+0] = 2.0;
             points_[(3*observation)+1] = 0.75;
           }
-          points_[(3*observation)+2] = 0.0;
+          /* z-plane of base_link is 2.25" off real ground */
+          points_[(3*observation)+2] = -0.05715;
 
           /* Create ground residual */
           ceres::CostFunction* cost_function = GroundError::Create(1.0);
@@ -178,10 +179,27 @@ public:
 
           /* Create camera chain error block, project through to do a sanity check on reprojection */
           RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 8,
-                                                   root_frame_, data[i].rgbd_observations[j].header.frame_id,
+                                                   root_frame_, data[2].rgbd_observations[0].header.frame_id,
                                                    observations_[(observation*3)+0],
                                                    observations_[(observation*3)+1],
                                                    observations_[(observation*3)+2]);
+          double reprojection[3];
+          if (progress_to_stdout)
+          {
+            camera_error->getEstimatedGlobal(0, &reprojection[0]);
+            std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
+                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
+          }
+          camera_error->getMeasurement(0, &reprojection[0]);
+          if (progress_to_stdout)
+            std::cout << "Camera measurement:                    " << reprojection[0] <<
+                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
+
+          camera_error->getExpected(0, &points_[(3*i)], &reprojection[0]);
+          if (progress_to_stdout)
+            std::cout << "Reprojection estimate:                 " << reprojection[0] <<
+                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
+
           /* Create camera residual */
           cost_function = RgbdError::Create<7>(camera_error);
           problem_->AddResidualBlock(cost_function,

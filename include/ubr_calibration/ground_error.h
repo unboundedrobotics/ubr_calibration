@@ -31,7 +31,11 @@ struct GroundError
   bool operator()(const double* const point,
                   double* residuals) const
   {
-    residuals[0] = cost_ * point[2] * point[2];
+    /*
+     * z-plane of base_link is 2.25" off real ground
+     * error is based only on how far off ground the points are
+     */
+    residuals[0] = cost_ * (point[2]-(-0.05715)) * (point[2]-(-0.05715));
     return true;
   }
 
