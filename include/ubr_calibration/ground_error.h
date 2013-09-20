@@ -35,7 +35,10 @@ struct GroundError
      * z-plane of base_link is 2.25" off real ground
      * error is based only on how far off ground the points are
      */
-    residuals[0] = cost_ * (point[2]-(-0.05715)) * (point[2]-(-0.05715));
+    if (fabs(point[2]-(-0.5715)) > 0.02)
+      residuals[0] = cost_ * (point[2]-(-0.05715)) * (point[2]-(-0.05715));
+    else
+      residuals[0] = 0.0;
     return true;
   }
 
