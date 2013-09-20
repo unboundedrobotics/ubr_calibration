@@ -17,17 +17,23 @@
 KDL::JntArray getChainPositionsFromMsg(const KDL::Chain& chain,
                                        const sensor_msgs::JointState& msg)
 {
-  // initialize with length
+  /* Check that message is filled in */
+  if (msg.name.size() == 0)
+  {
+    std::cerr << "sensor_msgs::JointState is empty" << std::endl;
+  }
+
+  /* Initialize with length */
   KDL::JntArray positions(chain.getNrOfJoints());
 
-  // iterate through segments
+  /* Iterate through segments */
   int j = 0;
   for (int i = 0; i < chain.getNrOfSegments(); ++i)
   {
-    // some segments are fixed joints, ignore these
+    /* Some segments are fixed joints, ignore these */
     if (chain.getSegment(i).getJoint().getType()!=KDL::Joint::None)
     {
-      // find joint in sensor message, by name
+      /* Find joint in sensor message, by name */
       std::string name = chain.getSegment(i).getJoint().getName();
       for (int k = 0; k < msg.name.size(); ++k)
       {

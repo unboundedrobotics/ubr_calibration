@@ -103,6 +103,9 @@ int main(int argc, char **argv)
       continue;
     }
 
+    /* Fill in joint values */
+    chain_manager_.getState(&msg.joint_states);
+
     /* Publish calibration data message. */
     pub.publish(msg);
 
@@ -123,6 +126,9 @@ int main(int argc, char **argv)
       ROS_WARN("Failed to capture ground sample.");
       continue;
     }
+
+    /* Fill in joint values */
+    chain_manager_.getState(&msg.joint_states);
 
     /* Publish calibration data message. */
     pub.publish(msg);
