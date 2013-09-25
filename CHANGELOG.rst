@@ -2,8 +2,8 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.0 (2013-09-25)
+------------------
 * make led finder more accurate
 * add launch files for calibration
 * calibrate using new gripper_led_link
