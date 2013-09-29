@@ -12,6 +12,7 @@
 #include <tf/transform_listener.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
+#include <ubr_calibration/CalibrationData.h>
 #include <ubr_msgs/GripperLedCommandAction.h>
 #include <actionlib/client/simple_action_client.h>
 
@@ -47,17 +48,17 @@ public:
 
   /**
    * \brief Attempts to find the led in incoming data.
-   * \param point_stamped This will be filled in with point data, if any.
+   * \param msg CalibrationData instance to fill in with led point information.
    * \returns True if point has been filled in.
    */
-  bool findLed(geometry_msgs::PointStamped * point_stamped);
+  bool findLed(ubr_calibration::CalibrationData * msg);
 
   /**
    * \brief Attempts to find the ground plane.
-   * \param points This will be filled in with ground plane points.
+   * \param msg CalibrationData instance to fill in with ground points.
    * \returns True if points have been filled in.
    */
-  bool findGroundPlane(std::vector<geometry_msgs::PointStamped>& points);
+  bool findGroundPlane(ubr_calibration::CalibrationData * msg);
 
 private:
   void cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);

@@ -24,6 +24,7 @@
  * \section residuals Residual Blocks:
  *   - reprojection of 3d point, through the arm
  *   - reprojection of 3d point, through the 3d Kinect
+ *   - ground error, such that points from the ground are actually at z = 0.0
  *
  *  For each block, it will need to be able to reproject THROUGH a particular set of joint angles.
  *

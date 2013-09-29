@@ -68,8 +68,8 @@ struct RgbdError
     getExpected(free_params, point, &expected[0]);
     getMeasurement(free_params, &measurement[0]);
 
-    residuals[0] = (expected[0] - measurement[0])*3.0;
-    residuals[1] = (expected[1] - measurement[1])*3.0;
+    residuals[0] = expected[0] - measurement[0];
+    residuals[1] = expected[1] - measurement[1];
     residuals[2] = expected[2] - measurement[2];
     return true;  // always return true
   }

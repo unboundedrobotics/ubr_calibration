@@ -114,9 +114,9 @@ std::string robot_description =
 "    <axis xyz='0 0 1'/>"
 "    <origin rpy='0 0 0' xyz='0.15 0 -0.015'/>"
 "    <parent link='arm_wrist_roll_link'/>"
-"    <child link='gripper_link'/>"
+"    <child link='gripper_led_frame'/>"
 "  </joint>"
-"  <link name='gripper_link'/>"
+"  <link name='gripper_led_frame'/>"
 "  <joint name='head_joint' type='fixed'>"
 "    <origin rpy='0 0 0' xyz='0 0 0.512375'/>"
 "    <parent link='torso_link'/>"
@@ -185,7 +185,7 @@ std::string robot_description =
 
 TEST(OptimizerTest, error_blocks_maxwell)
 {
-  Optimizer opt(robot_description, "base_link", "gripper_link");
+  Optimizer opt(robot_description, "base_link", "gripper_led_frame");
 
   std::vector<ubr_calibration::CalibrationData> data;
   ubr_calibration::CalibrationData msg;
@@ -214,6 +214,11 @@ TEST(OptimizerTest, error_blocks_maxwell)
   msg.rgbd_observations[0].point.x = -0.0143163670728;
   msg.rgbd_observations[0].point.y = 0.111304592065;
   msg.rgbd_observations[0].point.z = 0.522079317365;
+  msg.world_observations.resize(1);
+  msg.world_observations[0].header.frame_id = "gripper_led_frame";
+  msg.world_observations[0].point.x = 0.0;
+  msg.world_observations[0].point.y = 0.0;
+  msg.world_observations[0].point.z = 0.0;
   data.push_back(msg);
 
   msg.joint_states.position[1] = -0.019781999999999966;

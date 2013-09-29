@@ -75,7 +75,6 @@ public:
 
     /* observations = points = [X, Y, Z] * number of samples. */
     num_observations_ = 0;
-    int ground_observations_ = 0;
     for (size_t i = 0; i < data.size(); ++i)
       num_observations_ += data[i].rgbd_observations.size();
     observations_ = new double[3 * num_observations_];
@@ -112,186 +111,97 @@ public:
     /* Houston, we have a problem.. */
     problem_ = new ceres::Problem();
 
-    /* Store errors for later */
-    std::vector<double> error_x;
-    std::vector<double> error_y;
-    std::vector<double> error_z;
-    std::vector<double> error_t;  // total
-
     /* For each observation: */
     int observation = 0;
+    int ground_observations = 0;
     for (size_t i = 0; i < data.size(); ++i)
     {
-      if (progress_to_stdout)
-        std::cout << "\nAdding observation:" << observation << std::endl;
-
       /* Get joint positions from message. */
       KDL::JntArray arm_positions = getChainPositionsFromMsg(arm_chain_, data[i].joint_states);
       KDL::JntArray camera_positions = getChainPositionsFromMsg(camera_chain_, data[i].joint_states);
 
-      if (data[i].rgbd_observations.size() > 1)
+      /* Add observations */
+      for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
       {
-        for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
+        if (progress_to_stdout)
+          std::cout << "\nAdding observation:" << observation << std::endl;
+
+        /* Load observations_ from point data in rgbd_observations */
+        observations_[(3*observation)+0] = data[i].rgbd_observations[j].point.x;
+        observations_[(3*observation)+1] = data[i].rgbd_observations[j].point.y;
+        observations_[(3*observation)+2] = data[i].rgbd_observations[j].point.z;
+
+        if (data[i].world_observations[j].header.frame_id == led_frame_)
         {
-          ++ground_observations_;
+          /* Create an arm chain error block */
+          ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
 
-          /* Load observations_ from point data in rgbd_observations */
-          observations_[(3*observation)+0] = data[i].rgbd_observations[j].point.x;
-          observations_[(3*observation)+1] = data[i].rgbd_observations[j].point.y;
-          observations_[(3*observation)+2] = data[i].rgbd_observations[j].point.z;
+          /* Point is a reprojection through arm */
+          KDL::Frame projected = arm_error->getChainFK(0);
+          points_[(3*observation)+0] = projected.p.x();
+          points_[(3*observation)+1] = projected.p.y();
+          points_[(3*observation)+2] = projected.p.z();
 
-          /* TODO: project these? */
-          if (data[i].rgbd_observations[j].header.frame_id.compare("pt0") == 0)
-          {
-            points_[(3*observation)+0] = 0.5;
-            points_[(3*observation)+1] = -0.25;
-          }
-          else if (data[i].rgbd_observations[j].header.frame_id.compare("pt1") == 0)
-          {
-            points_[(3*observation)+0] = 0.5;
-            points_[(3*observation)+1] = 0.25;
-          }
-          else if (data[i].rgbd_observations[j].header.frame_id.compare("pt2") == 0)
-          {
-            points_[(3*observation)+0] = 1.0;
-            points_[(3*observation)+1] = -0.5;
-          }
-          else if (data[i].rgbd_observations[j].header.frame_id.compare("pt3") == 0)
-          {
-            points_[(3*observation)+0] = 1.0;
-            points_[(3*observation)+1] = 0.5;
-          }
-          else if (data[i].rgbd_observations[j].header.frame_id.compare("pt4") == 0)
-          {
-            points_[(3*observation)+0] = 2.0;
-            points_[(3*observation)+1] = -0.75;
-          }
-          else if (data[i].rgbd_observations[j].header.frame_id.compare("pt5") == 0)
-          {
-            points_[(3*observation)+0] = 2.0;
-            points_[(3*observation)+1] = 0.75;
-          }
-          /* z-plane of base_link is 2.25" off real ground */
-          points_[(3*observation)+2] = -0.05715;
+          /* Create arm residual */
+          ceres::CostFunction * cost_function = ChainError::Create<8>(arm_error);
+          problem_->AddResidualBlock(cost_function,
+                                     NULL /* squared loss */,
+                                     &free_params_[adjustments_["torso_lift_joint"].idx],
+                                     &points_[(3*observation)]);
+
+          if (progress_to_stdout)
+            std::cout << "Initial estimate of point (via arm):   " << projected.p.x() <<
+                         "," << projected.p.y() << "," << projected.p.z() << std::endl;
+        }
+        else
+        {
+          /* Currently ground is the only other option */
+          ++ground_observations;
+
+          /* Point is set directly from world observation */
+          points_[(3*observation)+0] = data[i].world_observations[j].point.x;
+          points_[(3*observation)+1] = data[i].world_observations[j].point.y;
+          points_[(3*observation)+2] = data[i].world_observations[j].point.z;
 
           /* Create ground residual */
-          ceres::CostFunction* cost_function = GroundError::Create(3.0);
+          ceres::CostFunction * cost_function = GroundError::Create(2.0);  // TODO set ground_error scale
           problem_->AddResidualBlock(cost_function,
                                      NULL /* squared loss */,
                                      &points_[(3*observation)]);
 
-          /* Create camera chain error block, project through to do a sanity check on reprojection */
-          RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 8,
-                                                   root_frame_, data[2].rgbd_observations[0].header.frame_id,
-                                                   observations_[(observation*3)+0],
-                                                   observations_[(observation*3)+1],
-                                                   observations_[(observation*3)+2]);
-          double reprojection[3];
           if (progress_to_stdout)
-          {
-            std::cout << "Estimated ground point:                " << points_[(3*observation)+0] <<
+            std::cout << "Initial estimate of point (ground):    " << points_[(3*observation)+0] <<
                          "," << points_[(3*observation)+1] << "," << points_[(3*observation)+2] << std::endl;
-            camera_error->getEstimatedGlobal(0, &reprojection[0]);
-            std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
-                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-            double x = fabs(points_[(3*observation)+0] - reprojection[0]);
-            double y = fabs(points_[(3*observation)+1] - reprojection[1]);
-            double z = fabs(points_[(3*observation)+2] - reprojection[2]);
-            error_x.push_back(x);
-            error_y.push_back(y);
-            error_z.push_back(z);
-            error_t.push_back(sqrt((x * x) + (y * y) + (z * z)));
-          }
-          camera_error->getMeasurement(0, &reprojection[0]);
-          if (progress_to_stdout)
-            std::cout << "Camera measurement:                    " << reprojection[0] <<
-                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-          camera_error->getExpected(0, &points_[(3*observation)], &reprojection[0]);
-          if (progress_to_stdout)
-            std::cout << "Reprojection estimate:                 " << reprojection[0] <<
-                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-          /* Create camera residual */
-          cost_function = RgbdError::Create<7>(camera_error);
-          problem_->AddResidualBlock(cost_function,
-                                     NULL /* squared loss */,
-                                     &free_params_[adjustments_["head_pan_joint"].idx],
-                                     &points_[(3*observation)]);
-
-          /* Note: ground/camera error blocks will be managed by scoped_ptr in cost functor
-                   which takes ownership, and so we do not need to delete them here */
-
-          ++observation;
         }
-      }
-      else
-      {
-        /* Load observations_ from point data in rgbd_observations */
-        observations_[(3*observation)+0] = data[i].rgbd_observations[0].point.x;
-        observations_[(3*observation)+1] = data[i].rgbd_observations[0].point.y;
-        observations_[(3*observation)+2] = data[i].rgbd_observations[0].point.z;
 
-        /* Create arm chain error block, project through arm to get initial points[i] */
-        ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
-        KDL::Frame projected = arm_error->getChainFK(0);
-        points_[(3*observation)+0] = projected.p.x();
-        points_[(3*observation)+1] = projected.p.y();
-        points_[(3*observation)+2] = projected.p.z();
-        if (progress_to_stdout)
-          std::cout << "Initial estimate of point (via arm):   " << projected.p.x() <<
-                       "," << projected.p.y() << "," << projected.p.z() << std::endl;
-
-        /* Create camera chain error block, project through to do a sanity check on reprojection */
+        /* Create camera chain error block */
         RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 8,
-                                                 root_frame_, data[i].rgbd_observations[0].header.frame_id,
+                                                 root_frame_, data[i].rgbd_observations[j].header.frame_id,
                                                  observations_[(observation*3)+0],
                                                  observations_[(observation*3)+1],
                                                  observations_[(observation*3)+2]);
-        double reprojection[3];
-        if (progress_to_stdout)
+
+        /* Reproject camera error for comparison */
         {
+          double reprojection[3];
           camera_error->getEstimatedGlobal(0, &reprojection[0]);
-          std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
-                       "," << reprojection[1] << "," << reprojection[2] << std::endl;
 
-          double x = fabs(projected.p.x() - reprojection[0]);
-          double y = fabs(projected.p.y() - reprojection[1]);
-          double z = fabs(projected.p.z() - reprojection[2]);
-          error_x.push_back(x);
-          error_y.push_back(y);
-          error_z.push_back(z);
-          error_t.push_back(sqrt((x * x) + (y * y) + (z * z)));
+          if (progress_to_stdout)
+            std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
+                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
         }
-        camera_error->getMeasurement(0, &reprojection[0]);
-        if (progress_to_stdout)
-          std::cout << "Camera measurement:                    " << reprojection[0] <<
-                       "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-        camera_error->getExpected(0, &points_[(3*observation)], &reprojection[0]);
-        if (progress_to_stdout)
-          std::cout << "Reprojection estimate:                 " << reprojection[0] <<
-                       "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-        /* Create arm residual */
-        ceres::CostFunction* cost_function = ChainError::Create<8>(arm_error);
-        problem_->AddResidualBlock(cost_function,
-                                   NULL /* squared loss */,
-                                   &free_params_[adjustments_["torso_lift_joint"].idx],
-                                   &points_[(3*observation)]);
 
         /* Create camera residual */
-        cost_function = RgbdError::Create<7>(camera_error);
+        ceres::CostFunction * cost_function = RgbdError::Create<7>(camera_error);
         problem_->AddResidualBlock(cost_function,
                                    NULL /* squared loss */,
                                    &free_params_[adjustments_["head_pan_joint"].idx],
                                    &points_[(3*observation)]);
 
-        /* Note: arm/camera error blocks will be managed by scoped_ptr in cost functor
-                 which takes ownership, and so we do not need to delete them here */
-
         ++observation;
+
+        /* Note: the error blocks will be managed by scoped_ptr in cost functor
+                 which takes ownership, and so we do not need to delete them here */
       }
     }
 
@@ -307,51 +217,70 @@ public:
     /* For each observation: */
     if (progress_to_stdout)
     {
+      observation = 0;
+
       for (size_t i = 0; i < data.size(); ++i)
       {
-        std::cout << "\nAnalyzing observation:" << i << std::endl;
-
         /* Get joint positions from message. */
         KDL::JntArray arm_positions = getChainPositionsFromMsg(arm_chain_, data[i].joint_states);
         KDL::JntArray camera_positions = getChainPositionsFromMsg(camera_chain_, data[i].joint_states);
 
-        KDL::Frame projected;
-        if (i < ground_observations_)
+        /* Analyze Observation */
+        for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
         {
-          projected.p.x(points_[(3*i)+0]);
-          projected.p.y(points_[(3*i)+1]);
-          projected.p.z(points_[(3*i)+2]);
+          std::cout << "\nAnalyzing observation: " << observation << std::endl;
+
+          /* Create camera chain error block again */
+          RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
+                                                   root_frame_, data[i].rgbd_observations[j].header.frame_id,
+                                                   observations_[(observation*3)+0],
+                                                   observations_[(observation*3)+1],
+                                                   observations_[(observation*3)+2]);
+
+          double measurement[3];
+          double expected[3];
+
+          camera_error->getMeasurement(0, &measurement[0]);
+          std::cout << "Camera measurement:                   " << measurement[0] <<
+                       "," << measurement[1] << "," << measurement[2] << std::endl;
+
+          camera_error->getExpected(0, &points_[(3*observation)], &expected[0]);
+          std::cout << "Reprojection estimate:                " << expected[0] <<
+                       "," << expected[1] << "," << expected[2] << std::endl;
+
+          /* Reproject camera */
+          double cam_reprojection[3];
+          camera_error->getEstimatedGlobal(&free_params_[7], &cam_reprojection[0]);
+          std::cout << "Final estimate of point (via camera): " << cam_reprojection[0] <<
+                       "," << cam_reprojection[1] << "," << cam_reprojection[2] << std::endl;
+
+          if (observation < ground_observations)
+          {
+            std::cout << "  error (camera to ground):           " << cam_reprojection[2] << std::endl;
+          }
+          else
+          {
+            /* Create arm chain error block again */
+            ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
+
+            /* Project through arm */
+            KDL::Frame arm_reprojection;
+            arm_reprojection = arm_error->getChainFK(&free_params_[0]);
+            std::cout << "Final estimate of point (via arm):    " << arm_reprojection.p.x() <<
+                         "," << arm_reprojection.p.y() << "," << arm_reprojection.p.z() << std::endl;
+
+            double x = fabs(arm_reprojection.p.x() - cam_reprojection[0]);
+            double y = fabs(arm_reprojection.p.y() - cam_reprojection[1]);
+            double z = fabs(arm_reprojection.p.z() - cam_reprojection[2]);
+            double t = sqrt((x * x) + (y * y) + (z * z));
+
+            std::cout << "  error (x):                          " << x << std::endl;
+            std::cout << "  error (y):                          " << y << std::endl;
+            std::cout << "  error (z):                          " << z << std::endl;
+            std::cout << "  error (total):                      " << t << std::endl;
+          }
+          ++observation;
         }
-        else
-        {
-          /* Create arm chain error block again */
-          ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
-          projected = arm_error->getChainFK(&free_params_[0]);
-          std::cout << "Final estimate of point (via arm):    " << projected.p.x() <<
-                       "," << projected.p.y() << "," << projected.p.z() << std::endl;
-        }
-
-        /* Create camera chain error block again */
-        RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
-                                                 root_frame_, data[i].rgbd_observations[0].header.frame_id,
-                                                 observations_[(i*3)+0],
-                                                 observations_[(i*3)+1],
-                                                 observations_[(i*3)+2]);
-        double reprojection[3];
-        camera_error->getEstimatedGlobal(&free_params_[7], &reprojection[0]);
-        std::cout << "Final estimate of point (via camera): " << reprojection[0] <<
-                     "," << reprojection[1] << "," << reprojection[2] << std::endl;
-
-        double x = fabs(projected.p.x() - reprojection[0]);
-        double y = fabs(projected.p.y() - reprojection[1]);
-        double z = fabs(projected.p.z() - reprojection[2]);
-        double t = sqrt((x * x) + (y * y) + (z * z));
-
-
-        std::cout << "Error\n      x: " << x << "\t(was " << ((double)error_x[i]) << ")" <<
-                          "\n      y: " << y << "\t(was " << ((double)error_y[i]) << ")" <<
-                          "\n      z: " << z << "\t(was " << ((double)error_z[i]) << ")" <<
-                          "\n  total: " << t << "\t(was " << ((double)error_t[i]) << ")" << std::endl;
       }
     }
 

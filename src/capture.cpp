@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     ubr_calibration::CalibrationData msg;
 
     /* Get pose of the ground plane */
-    if (!led_finder_.findGroundPlane(msg.rgbd_observations))
+    if (!led_finder_.findGroundPlane(&msg))
     {
       ROS_WARN("Failed to capture ground sample.");
       continue;
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
     ubr_calibration::CalibrationData msg;
 
     /* Get pose of the ground plane */
-    if (!led_finder_.findGroundPlane(msg.rgbd_observations))
+    if (!led_finder_.findGroundPlane(&msg))
     {
       ROS_WARN("Failed to capture ground sample.");
       continue;
@@ -161,8 +161,7 @@ int main(int argc, char **argv)
     chain_manager_.waitToSettle();
 
     /* Get pose of the LED */
-    msg.rgbd_observations.resize(1);
-    if (!led_finder_.findLed(&msg.rgbd_observations[0]))
+    if (!led_finder_.findLed(&msg))
     {
       ROS_WARN("Failed to capture sample.");
       continue;

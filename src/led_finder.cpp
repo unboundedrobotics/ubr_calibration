@@ -27,12 +27,11 @@ bool LedFinder::waitForCloud()
   return !waiting_;
 }
 
-/*
- * TODO: Future Improvements
- *  Accuracy might be improved by finding a plane around the gripper LED.
- */
-bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
+bool LedFinder::findLed(ubr_calibration::CalibrationData * msg)
 {
+  geometry_msgs::PointStamped rgbd;
+  geometry_msgs::PointStamped world;
+
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr prev_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
   ubr_msgs::GripperLedCommandGoal command;
@@ -127,9 +126,9 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   }
 
   /* diff_max_idx is now the most likely pixel. */
-  point_stamped->point.x = cloud_ptr_->points[diff_max_idx].x;
-  point_stamped->point.y = cloud_ptr_->points[diff_max_idx].y;
-  point_stamped->point.z = cloud_ptr_->points[diff_max_idx].z;
+  rgbd.point.x = cloud_ptr_->points[diff_max_idx].x;
+  rgbd.point.y = cloud_ptr_->points[diff_max_idx].y;
+  rgbd.point.z = cloud_ptr_->points[diff_max_idx].z;
 
   /* Get a better centroid */
   int centroid_points = 0;
@@ -141,9 +140,9 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
     /* Using highly likely points */
     if (diff[i] > (threshold_ * 0.75))
     {
-      double dx = cloud_ptr_->points[i].x - point_stamped->point.x;
-      double dy = cloud_ptr_->points[i].y - point_stamped->point.y;
-      double dz = cloud_ptr_->points[i].z - point_stamped->point.z;
+      double dx = cloud_ptr_->points[i].x - rgbd.point.x;
+      double dy = cloud_ptr_->points[i].y - rgbd.point.y;
+      double dz = cloud_ptr_->points[i].z - rgbd.point.z;
 
       /* That are less than 1cm from the max point */
       if ( (dx*dx) + (dy*dy) + (dz*dz) < 0.1 )
@@ -163,31 +162,30 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   }
 
   /* Update from centroid */
-  point_stamped->point.x = centroid_sum_x/centroid_points;
-  point_stamped->point.y = centroid_sum_y/centroid_points;
-  point_stamped->point.z = centroid_sum_z/centroid_points;
+  rgbd.point.x = centroid_sum_x/centroid_points;
+  rgbd.point.y = centroid_sum_y/centroid_points;
+  rgbd.point.z = centroid_sum_z/centroid_points;
 
   /* Fill in the headers */
 #if PCL_VERSION_COMPARE(<,1,7,0)
-  point_stamped->header = cloud_ptr_->header;
+  rgbd.header = cloud_ptr_->header;
 #else
-  point_stamped->header.seq = cloud_ptr_->header.seq;
-  point_stamped->header.frame_id = cloud_ptr_->header.frame_id;
-  point_stamped->header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
+  rgbd.header.seq = cloud_ptr_->header.seq;
+  rgbd.header.frame_id = cloud_ptr_->header.frame_id;
+  rgbd.header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
 #endif
 
   /* Do not accept NANs */
-  if (isnan(point_stamped->point.x) ||
-      isnan(point_stamped->point.y) ||
-      isnan(point_stamped->point.z))
+  if (isnan(rgbd.point.x) ||
+      isnan(rgbd.point.y) ||
+      isnan(rgbd.point.z))
     return false;
 
   /* Transform to led frame */
-  geometry_msgs::PointStamped point_led_link;
   try
   {
-    listener_.transformPoint("gripper_led_link", ros::Time(0), *point_stamped,
-                             point_stamped->header.frame_id, point_led_link);
+    listener_.transformPoint("gripper_led_link", ros::Time(0), rgbd,
+                             rgbd.header.frame_id, world);
   }
   catch(const tf::TransformException &ex)
   {
@@ -196,9 +194,9 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   }
 
   /* Compute distance */
-  double distance = (point_led_link.point.x * point_led_link.point.x) +
-                    (point_led_link.point.y * point_led_link.point.y) +
-                    (point_led_link.point.z * point_led_link.point.z);
+  double distance = (world.point.x * world.point.x) +
+                    (world.point.y * world.point.y) +
+                    (world.point.z * world.point.z);
 
   /* Point must be within a certain distance of gripper_led_link */
   if (distance > 0.1)
@@ -208,13 +206,17 @@ bool LedFinder::findLed(geometry_msgs::PointStamped * point_stamped)
   }
 
   /* Publish point. */
-  publisher_.publish(*point_stamped);
+  publisher_.publish(rgbd);
+
+  /* Push back observations */
+  msg->rgbd_observations.push_back(rgbd);
+  msg->world_observations.push_back(world);
 
   /* We found a point. */
   return true;
 }
 
-bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points)
+bool LedFinder::findGroundPlane(ubr_calibration::CalibrationData* msg)
 {
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr prev_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
@@ -223,102 +225,84 @@ bool LedFinder::findGroundPlane(std::vector<geometry_msgs::PointStamped>& points
     return false;
 
   /* 6 potential points */
-  double x[] = {0.5, 0.5, 1.0, 1.0, 2.0, 2.0};
-  double y[] = {-0.25, 0.25, -0.5, 0.5, -0.75, 0.75};
-  std::vector<double> dist(6, 0.1);
-  std::vector<int> idx(6,-1);
-  int found = 0;  // how many points have we found
-  std::vector<std::string> point_names;
-  point_names.push_back("pt0");
-  point_names.push_back("pt1");
-  point_names.push_back("pt2");
-  point_names.push_back("pt3");
-  point_names.push_back("pt4");
-  point_names.push_back("pt5");
+  double x[] = {0.5, 0.5, 1.0, 1.0, 1.5, 1.5};
+  double y[] = {-0.25, 0.25, -0.5, 0.5, -0.65, 0.65};
 
-  /* For each point, see if it close to a potential point */
-  for (size_t i = 0; i < cloud_ptr_->size(); ++i)
+  /* For each potential point, find closest point */
+  for (size_t i = 0; i < 6; ++i)
   {
-    /* No nans */
-    if (isnan(cloud_ptr_->points[i].x) ||
-        isnan(cloud_ptr_->points[i].y) ||
-        isnan(cloud_ptr_->points[i].z))
-      continue;
+    geometry_msgs::PointStamped rgbd;
+    geometry_msgs::PointStamped world;
 
-    /* Transform point to base frame */
-    geometry_msgs::PointStamped p, p_base;
-    #if PCL_VERSION_COMPARE(<,1,7,0)
-    p.header = cloud_ptr_->header;
-    #else
-    p.header.seq = cloud_ptr_->header.seq;
-    p.header.frame_id = cloud_ptr_->header.frame_id;
-    p.header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
-    #endif
-    p.point.x = cloud_ptr_->points[i].x;
-    p.point.y = cloud_ptr_->points[i].y;
-    p.point.z = cloud_ptr_->points[i].z;
-    try
-    {
-      listener_.transformPoint("base_link", p, p_base);
-    }
-    catch(const tf::TransformException &ex)
-    {
-      ROS_ERROR("Failed to transform point to base_link");
-      continue;
-    }
+    double dist = 0.11;
 
-    /* Check against candidate points */
-    for (size_t j = 0; j < 6; ++j)
+    /* End up cycling through the cloud 6 times, but makes code
+       cleaner, and we only do this twice */
+    for (size_t j = 0; j < cloud_ptr_->size(); ++j)
     {
-      double dx = p_base.point.x - x[j];
-      double dy = p_base.point.y - y[j];
-      /* z-plane of base_link is 2.25" off real ground */
-      double dz = p_base.point.z - -0.05715;
+      /* No nans */
+      if (isnan(cloud_ptr_->points[j].x) ||
+          isnan(cloud_ptr_->points[j].y) ||
+          isnan(cloud_ptr_->points[j].z))
+        continue;
 
+      /* Transform cloud point to base frame */
+      geometry_msgs::PointStamped p, p_base;
+      #if PCL_VERSION_COMPARE(<,1,7,0)
+      p.header = cloud_ptr_->header;  // groovy still uses std_msgs::header in pcl
+      #else
+      p.header.seq = cloud_ptr_->header.seq;
+      p.header.frame_id = cloud_ptr_->header.frame_id;
+      p.header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
+      #endif
+      p.point.x = cloud_ptr_->points[j].x;
+      p.point.y = cloud_ptr_->points[j].y;
+      p.point.z = cloud_ptr_->points[j].z;
+      try
+      {
+        listener_.transformPoint("base_link", p, p_base);
+      }
+      catch(const tf::TransformException &ex)
+      {
+        ROS_ERROR("Failed to transform point to base_link");
+        continue;
+      }
+
+      /* Get distance from desired to candidate point */
+      double dx = p_base.point.x - x[i];
+      double dy = p_base.point.y - y[i];
+      double dz = p_base.point.z;
       double d = (dx*dx) + (dy*dy) + (dz*dz);
 
-      if (d < dist[j])
+      if (d < dist)
       {
-        dist[j] = d;
-        if (idx[j] == -1)
-          ++found;
-        idx[j] = i;
+        /* Set rgbd observation */
+        rgbd = p;
+
+        /* Set world observation */
+        world.header.frame_id = "ground_plane";
+        world.point.x = p_base.point.x;
+        world.point.y = p_base.point.y;
+        world.point.z = p_base.point.z;
+
+        dist = d;
       }
     }
-  }
 
-  if (found >= 4)
-  {
-    points.resize(found);
-
-    int i = 0;
-    for (size_t j = 0; j < 6; ++j)
+    if (dist < 0.1)
     {
-      if (idx[j] == -1)
-        continue;
-      /* Fill in the headers */
-      #if PCL_VERSION_COMPARE(<,1,7,0)
-      points[i].header = cloud_ptr_->header;
-      #else
-      points[i].header.seq = cloud_ptr_->header.seq;
-      points[i].header.frame_id = cloud_ptr_->header.frame_id;
-      points[i].header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
-      #endif
-      points[i].point.x = cloud_ptr_->points[idx[j]].x;
-      points[i].point.y = cloud_ptr_->points[idx[j]].y;
-      points[i].point.z = cloud_ptr_->points[idx[j]].z;
+      /* We found a point, push back observations */
+      msg->rgbd_observations.push_back(rgbd);
+      msg->world_observations.push_back(world);
 
       /* Publish point. */
-      publisher_.publish(points[i]);
-
-      /* Rename frame (this is a hack, maybe it should be cleaned up) */
-      points[i].header.frame_id = point_names[j];
-
-      ++i;
+      publisher_.publish(rgbd);
     }
-
-    return true;
   }
+
+  /* Require 4 points */
+  if (msg->rgbd_observations.size() >= 4)
+    return true;
 
   /* Not enough points found */
   return false;
