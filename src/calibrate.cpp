@@ -76,10 +76,40 @@ int main(int argc, char** argv)
 
   /* Parse calibration_data topic */
   rosbag::View data_view_(bag_, rosbag::TopicQuery("calibration_data"));
+
+  /* Find typical offset */
+  double x = 0.0; double y = 0.0; double z = 0.0;
+  int msg_count = 0;
+  BOOST_FOREACH (rosbag::MessageInstance const m, data_view_)
+  {
+    ubr_calibration::CalibrationData::ConstPtr msg = m.instantiate<ubr_calibration::CalibrationData>();
+    if (msg->world_observations[0].header.frame_id != "gripper_led_link")
+      continue;
+    x += msg->world_observations[0].point.x;
+    y += msg->world_observations[0].point.y;
+    z += msg->world_observations[0].point.z;
+    ++msg_count;
+  }
+  x = x/msg_count;
+  y = y/msg_count;
+  z = z/msg_count;
+
   std::vector<ubr_calibration::CalibrationData> data;
   BOOST_FOREACH (rosbag::MessageInstance const m, data_view_)
   {
     ubr_calibration::CalibrationData::ConstPtr msg = m.instantiate<ubr_calibration::CalibrationData>();
+    if (msg->world_observations[0].header.frame_id == "gripper_led_link")
+    {
+      /* Include only 'good' samples */
+      double dx = msg->world_observations[0].point.x - x;
+      double dy = msg->world_observations[0].point.y - y;
+      double dz = msg->world_observations[0].point.z - z;
+      double d = sqrt((dx*dx) + (dy*dy) + (dx*dx));
+      if (d > 0.04)
+      {
+        continue;
+      }
+    }
     data.push_back(*msg);
   }
 
