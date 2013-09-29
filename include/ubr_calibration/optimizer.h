@@ -404,56 +404,53 @@ public:
           /* This is a joint */
           offsets[it->first] = free_params_[d.idx];
         }
-        else
+        if (d.x > -1)
         {
-          if (d.x > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_x")] = free_params_[d.x];
-          }
-          if (d.y > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_y")] = free_params_[d.y];
-          }
-          if (d.z > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_z")] = free_params_[d.z];
-          }
-          /* Angles are either all 3, or just one */
-          if ((d.roll > -1) && (d.pitch > -1) && (d.yaw > -1))
-          {
-            double roll, pitch, yaw;
-            /* Again, the d.X values are not actually roll/pitch/yaw */
-            KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[d.roll],
-                                                             free_params_[d.pitch],
-                                                             free_params_[d.yaw]);
-            /* Get roll, pitch, yaw about fixed axis */
-            rot.GetRPY(roll, pitch, yaw);
-            /* Fill in offsets */
-            std::string name = it->first;
-            offsets[name.append("_roll")] = roll;
-            name = it->first;
-            offsets[name.append("_pitch")] = pitch;
-            name = it->first;
-            offsets[name.append("_yaw")] = yaw;
-          }
-          else if (d.roll > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_roll")] = free_params_[d.roll];
-          }
-          else if (d.pitch > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_pitch")] = free_params_[d.pitch];
-          }
-          else if (d.yaw > -1)
-          {
-            std::string name = it->first;
-            offsets[name.append("_yaw")] = free_params_[d.yaw];
-          }
+          std::string name = it->first;
+          offsets[name.append("_x")] = free_params_[d.x];
+        }
+        if (d.y > -1)
+        {
+          std::string name = it->first;
+          offsets[name.append("_y")] = free_params_[d.y];
+        }
+        if (d.z > -1)
+        {
+          std::string name = it->first;
+          offsets[name.append("_z")] = free_params_[d.z];
+        }
+        /* Angles are either all 3, or just one */
+        if ((d.roll > -1) && (d.pitch > -1) && (d.yaw > -1))
+        {
+          double roll, pitch, yaw;
+          /* Again, the d.X values are not actually roll/pitch/yaw */
+          KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[d.roll],
+                                                           free_params_[d.pitch],
+                                                           free_params_[d.yaw]);
+          /* Get roll, pitch, yaw about fixed axis */
+          rot.GetRPY(roll, pitch, yaw);
+          /* Fill in offsets */
+          std::string name = it->first;
+          offsets[name.append("_roll")] = roll;
+          name = it->first;
+          offsets[name.append("_pitch")] = pitch;
+          name = it->first;
+          offsets[name.append("_yaw")] = yaw;
+        }
+        else if (d.roll > -1)
+        {
+          std::string name = it->first;
+          offsets[name.append("_roll")] = free_params_[d.roll];
+        }
+        else if (d.pitch > -1)
+        {
+          std::string name = it->first;
+          offsets[name.append("_pitch")] = free_params_[d.pitch];
+        }
+        else if (d.yaw > -1)
+        {
+          std::string name = it->first;
+          offsets[name.append("_yaw")] = free_params_[d.yaw];
         }
       }
     }

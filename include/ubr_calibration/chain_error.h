@@ -17,9 +17,6 @@
 
 /**
  *  \brief Used to find error in reprojection using a chain of joints.
- *
- *  Currently, the only free parameters supported are the joint angle offsets
- *  of each joint in the chain.
  */
 struct ChainError
 {
@@ -99,6 +96,52 @@ struct ChainError
       std::string name = chain_.getSegment(i).getJoint().getName();
       FrameCalibrationData d = (*info_)[name];
 
+      /* Apply frame corrections, if any */
+      if (d.calibrate)
+      {
+        KDL::Frame correction(KDL::Frame::Identity());
+        if (free_params)
+        {
+          /* Create 6-dof correction from free_params */
+          if (d.x > -1)
+            correction.p.x(free_params[d.x-offset_]);
+          if (d.y > -1)
+            correction.p.y(free_params[d.y-offset_]);
+          if (d.z > -1)
+            correction.p.z(free_params[d.z-offset_]);
+
+          /* Orientation is either 0, 1 or 3 parameters */
+          if ( (d.roll > -1) &&
+               (d.pitch > -1) &&
+               (d.yaw > -1) )
+          {
+            /* These don't really correspond to rpy -- but call them that anyways */
+            correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
+                                                        free_params[d.pitch-offset_],
+                                                        free_params[d.yaw-offset_]);
+          }
+          else if (d.roll > -1)
+          {
+            correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
+                                                        0,
+                                                        0);
+          }
+          else if (d.pitch > -1)
+          {
+            correction.M = rotation_from_axis_magnitude(0,
+                                                        free_params[d.pitch-offset_],
+                                                        0);
+          }
+          else if (d.yaw > -1)
+          {
+            correction.M = rotation_from_axis_magnitude(0,
+                                                        0,
+                                                        free_params[d.yaw-offset_]);
+          }
+        }
+        p_out = p_out * correction;
+      }
+
       if (chain_.getSegment(i).getJoint().getType() != KDL::Joint::None)
       {
         if (d.calibrate && free_params)
@@ -109,53 +152,7 @@ struct ChainError
       }
       else
       {
-        /* Does this frame get calibrated? */
-        if (d.calibrate)
-        {
-          KDL::Frame correction(KDL::Frame::Identity());
-          if (free_params)
-          {
-            /* Create 6-dof correction from free_params */
-            if (d.x > -1)
-              correction.p.x(free_params[d.x-offset_]);
-            if (d.y > -1)
-              correction.p.y(free_params[d.y-offset_]);
-            if (d.z > -1)
-              correction.p.z(free_params[d.z-offset_]);
-
-            /* Orientation is either 0, 1 or 3 parameters */
-            if ( (d.roll > -1) &&
-                 (d.pitch > -1) &&
-                 (d.yaw > -1) )
-            {
-               /* These don't really correspond to rpy -- but call them that anyways */
-               correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
-                                                           free_params[d.pitch-offset_],
-                                                           free_params[d.yaw-offset_]);
-            }
-            else if (d.roll > -1)
-            {
-               correction.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
-                                                           0,
-                                                           0);
-            }
-            else if (d.pitch > -1)
-            {
-               correction.M = rotation_from_axis_magnitude(0,
-                                                           free_params[d.pitch-offset_],
-                                                           0);
-            }
-            else if (d.yaw > -1)
-            {
-               correction.M = rotation_from_axis_magnitude(0,
-                                                           0,
-                                                           free_params[d.yaw-offset_]);
-            }
-          }
-          p_out = (p_out * correction) * chain_.getSegment(i).pose(0.0);
-        }
-        else
-          p_out = p_out * chain_.getSegment(i).pose(0.0);
+        p_out = p_out * chain_.getSegment(i).pose(0.0);
       }
     }
     return p_out;
