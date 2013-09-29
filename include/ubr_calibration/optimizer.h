@@ -429,6 +429,9 @@ public:
             KDL::Rotation rot = rotation_from_axis_magnitude(free_params_[d.roll],
                                                              free_params_[d.pitch],
                                                              free_params_[d.yaw]);
+            /* Get roll, pitch, yaw about fixed axis */
+            rot.GetRPY(roll, pitch, yaw);
+            /* Fill in offsets */
             std::string name = it->first;
             offsets[name.append("_roll")] = roll;
             name = it->first;

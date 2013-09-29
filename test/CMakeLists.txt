@@ -9,3 +9,9 @@ catkin_add_gtest(test_urdf_update test_update_urdf.cpp
 target_link_libraries(test_urdf_update ${Boost_LIBRARIES}
                                        ${catkin_LIBRARIES}
                                        ${tinyxml_LIBRARIES})
+
+catkin_add_gtest(test_rotations test_rotations.cpp)
+target_link_libraries(test_rotations ${Boost_LIBRARIES}
+                                     ${catkin_LIBRARIES}
+                                     ${CERES_LIBRARIES}
+                                     ${orocos_kdl_LIBRARIES})
