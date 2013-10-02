@@ -23,6 +23,22 @@ TEST(AngleTest, rotationsOK)
   EXPECT_EQ(one_radian_axis_z1.UnitX(), one_radian_axis_z2.UnitX());
   EXPECT_EQ(one_radian_axis_z1.UnitY(), one_radian_axis_z2.UnitY());
   EXPECT_EQ(one_radian_axis_z1.UnitZ(), one_radian_axis_z2.UnitZ());
+
+  double x, y, z;
+  axis_magnitude_from_rotation(one_radian_axis_x1, x, y, z);
+  EXPECT_DOUBLE_EQ(1.0, x);
+  EXPECT_DOUBLE_EQ(0.0, y);
+  EXPECT_DOUBLE_EQ(0.0, z);
+
+  axis_magnitude_from_rotation(neg_radian_axis_x1, x, y, z);
+  EXPECT_DOUBLE_EQ(-1.0, x);
+  EXPECT_DOUBLE_EQ(0.0, y);
+  EXPECT_DOUBLE_EQ(0.0, z);
+
+  axis_magnitude_from_rotation(one_radian_axis_z1, x, y, z);
+  EXPECT_DOUBLE_EQ(0.0, x);
+  EXPECT_DOUBLE_EQ(0.0, y);
+  EXPECT_DOUBLE_EQ(1.0, z);
 }
 
 int main(int argc, char** argv)

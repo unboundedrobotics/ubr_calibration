@@ -67,6 +67,22 @@ KDL::Rotation rotation_from_axis_magnitude(const double x, const double y, const
 }
 
 /**
+ *  \ brief Converts from KDL::Rotation to angle-axis-with-integrated-magnitude
+ */
+void axis_magnitude_from_rotation(const KDL::Rotation& r, double& x, double& y, double& z)
+{
+  double qx, qy, qz, qw;
+  r.GetQuaternion(qx, qy, qz, qw);
+
+  double magnitude = 2 * acos(qw);
+  double k = sqrt(1 - (qw*qw));
+
+  x = (qx / k) * magnitude;
+  y = (qy / k) * magnitude;
+  z = (qz / k) * magnitude;
+}
+
+/**
  *  \brief Data structure for generalizing specification of calibration.
  *         This maps free parameters to frame updates.
  *
