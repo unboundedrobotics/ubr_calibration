@@ -19,12 +19,12 @@ find_package(orocos_kdl)
 if (${orocos_kdl_FOUND})
 # must by hydro or later, orocos_kdl is a system dependency
 message (STATUS "using orocos-kdl system package")
-find_package(catkin REQUIRED message_generation actionlib roscpp kdl_parser ubr_msgs
+find_package(catkin REQUIRED message_generation actionlib cv_bridge roscpp kdl_parser ubr_msgs
                              std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
 else (${orocos_kdl_FOUND})
 # groovy, orocos_kdl is ros package
 message (STATUS "using orocos-kdl ros package")
-find_package(catkin REQUIRED message_generation actionlib roscpp orocos_kdl kdl_parser ubr_msgs
+find_package(catkin REQUIRED message_generation actionlib cv_bridge roscpp orocos_kdl kdl_parser ubr_msgs
                              std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
 endif (${orocos_kdl_FOUND})
 
@@ -55,6 +55,17 @@ target_link_libraries(capture ${Boost_LIBRARIES}
 add_dependencies(capture ubr_calibration_gencpp
                          ubr_msgs_gencpp)
 
+add_executable(capture_checkerboards src/capture_checkerboards.cpp
+                                     src/chain_manager.cpp
+                                     src/checkerboard_finder.cpp)
+target_link_libraries(capture_checkerboards ${Boost_LIBRARIES}
+                                            ${catkin_LIBRARIES}
+                                            ${CERES_LIBRARIES}
+                                            ${OpenCV_LIBRARIES}
+                                            ${PCL_LIBRARIES})
+add_dependencies(capture_checkerboards ubr_calibration_gencpp
+                                       ubr_msgs_gencpp)
+
 add_executable(calibrate src/calibrate.cpp
                          src/update_urdf.cpp)
 target_link_libraries(calibrate ${Boost_LIBRARIES}
@@ -66,7 +77,7 @@ add_dependencies(calibrate ubr_calibration_gencpp)
 
 add_subdirectory(test)
 
-install(TARGETS capture calibrate
+install(TARGETS capture calibrate capture_checkerboards
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 else (${Ceres_FOUND})
