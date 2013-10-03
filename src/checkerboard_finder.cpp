@@ -76,7 +76,7 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
     /* Set msg size */
     msg->rgbd_observations.resize(points_x * points_y);
     msg->world_observations.resize(points_x * points_y);
-    
+
     /* Fill in the headers */
     rgbd.header.seq = cloud_ptr_->header.seq;
     rgbd.header.frame_id = cloud_ptr_->header.frame_id;
@@ -91,7 +91,7 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
       world.point.y = i % points_x;
 
       /* Get 3d point */
-      int index = points[i].y * cloud_ptr_->width + points[i].x;
+      int index = (int)(points[i].y) * cloud_ptr_->width + (int)(points[i].x);
       rgbd.point.x = cloud_ptr_->points[index].x;
       rgbd.point.y = cloud_ptr_->points[index].y;
       rgbd.point.z = cloud_ptr_->points[index].z;
@@ -101,10 +101,10 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
           isnan(rgbd.point.y) ||
           isnan(rgbd.point.z))
       {
-        ROS_ERROR("NAN point");
+        ROS_ERROR_STREAM("NAN point on " << i);
         return false;
       }
-      
+
       msg->rgbd_observations[i] = rgbd;
       msg->world_observations[i] = world;
     }

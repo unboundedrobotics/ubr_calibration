@@ -67,13 +67,18 @@ struct CbRgbdError
     getExpected(free_params, pose, &expected[0]);
     getMeasurement(free_params, &measurement[0]);
 
+    residuals[0] = 0.0;
+    residuals[1] = 0.0;
+    residuals[2] = 0.0;
+
     for (size_t i = 0; i < (observations_.size()/3); ++i)
     {
       /* We generate residuals for x/y/z */
-      residuals[(3*i)+0] = expected[(3*i)+0] - measurement[(3*i)+0];
-      residuals[(3*i)+1] = expected[(3*i)+1] - measurement[(3*i)+1];
-      residuals[(3*i)+1] = expected[(3*i)+2] - measurement[(3*i)+2];
+      residuals[0] += fabs(expected[(3*i)+0] - measurement[(3*i)+0]);
+      residuals[1] += fabs(expected[(3*i)+1] - measurement[(3*i)+1]);
+      residuals[2] += fabs(expected[(3*i)+2] - measurement[(3*i)+2]);
     }
+
     return true;  // always return true
   }
 
@@ -114,6 +119,7 @@ struct CbRgbdError
         expected[(3*i)+0] = point_.p.x();
         expected[(3*i)+1] = point_.p.y();
         expected[(3*i)+2] = point_.p.z();
+        ++i;
       }
     }
   }

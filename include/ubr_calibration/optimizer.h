@@ -165,7 +165,7 @@ public:
                                    &poses_[(6*block)]);
 
         /* Create camera chain error block */
-        CbRgbdError * camera_error = new CbRgbdError(camera_chain_, camera_positions, &adjustments_, 8,
+        CbRgbdError * camera_error = new CbRgbdError(camera_chain_, camera_positions, &adjustments_, 14,
                                                      root_frame_, data[i].rgbd_observations[0].header.frame_id,
                                                      obs, 0.0245, 4);
 
