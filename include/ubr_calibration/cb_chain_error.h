@@ -62,7 +62,7 @@ struct CbChainError
     getMeasurement(free_params, &measurement[0]);
 
     for (int i = 0; i < 6; ++i)
-      residuals[i] = expected[i] - measurement[i];
+      residuals[i] = 20 * (expected[i] - measurement[i]);
     return true;  // always return true
   }
     
@@ -86,21 +86,8 @@ struct CbChainError
   inline void getMeasurement(const double* const free_params,
                              double* measurement) const
   {
-    /* Compute FK through the chain. */
-    KDL::Frame p_out = chain_.getChainFK(free_params);
-
-    /* Apply gripper link to checkerboard transform */
-    KDL::Frame checkerboard(KDL::Frame::Identity());
-    FrameCalibrationData d = (*info_)["gripper_cb"];
-    /* Create 6-dof correction from free_params */
-    checkerboard.p.x(free_params[d.x-offset_]);
-    checkerboard.p.y(free_params[d.y-offset_]);
-    checkerboard.p.z(free_params[d.z-offset_]);
-    checkerboard.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
-                                                  free_params[d.pitch-offset_],
-                                                  free_params[d.yaw-offset_]);
-    p_out = p_out * checkerboard;
-    
+    /* Compute FK through the chain, including checkerboard transform. */
+    KDL::Frame p_out = getChainFK(free_params);
     measurement[0] = p_out.p.x();
     measurement[1] = p_out.p.y();
     measurement[2] = p_out.p.z();
@@ -109,7 +96,31 @@ struct CbChainError
 
   inline KDL::Frame getChainFK(const double* const free_params) const
   {
-    return chain_.getChainFK(free_params);
+    KDL::Frame p_out = chain_.getChainFK(free_params);
+
+    /* Apply gripper link to checkerboard transform */
+    KDL::Frame checkerboard(KDL::Frame::Identity());
+    if (free_params)
+    {
+      FrameCalibrationData d = (*info_)["gripper_cb"];
+      /* Create 6-dof correction from free_params */
+      checkerboard.p.x(free_params[d.x-offset_]);
+      checkerboard.p.y(free_params[d.y-offset_]);
+      checkerboard.p.z(free_params[d.z-offset_]);
+      checkerboard.M = rotation_from_axis_magnitude(free_params[d.roll-offset_],
+                                                    free_params[d.pitch-offset_],
+                                                    free_params[d.yaw-offset_]);
+    }
+    else
+    {
+      /* Use defaults */
+      checkerboard.p.x(0.07+0.0245);
+      checkerboard.p.z(-0.065+0.0245);
+    }
+
+    p_out = p_out * checkerboard;
+
+    return p_out;
   }
 
   /**

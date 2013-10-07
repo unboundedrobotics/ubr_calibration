@@ -6,6 +6,7 @@
 #ifndef UBR_CALIBRATION_CB_RGBD_ERROR_H_
 #define UBR_CALIBRATION_CB_RGBD_ERROR_H_
 
+#include <ubr_calibration/cb_chain_error.h>
 #include <ubr_calibration/chain_functions.h>
 
 #include <kdl/chain.hpp>
@@ -67,16 +68,9 @@ struct CbRgbdError
     getExpected(free_params, pose, &expected[0]);
     getMeasurement(free_params, &measurement[0]);
 
-    residuals[0] = 0.0;
-    residuals[1] = 0.0;
-    residuals[2] = 0.0;
-
-    for (size_t i = 0; i < (observations_.size()/3); ++i)
+    for (size_t i = 0; i < observations_.size(); ++i)
     {
-      /* We generate residuals for x/y/z */
-      residuals[0] += fabs(expected[(3*i)+0] - measurement[(3*i)+0]);
-      residuals[1] += fabs(expected[(3*i)+1] - measurement[(3*i)+1]);
-      residuals[2] += fabs(expected[(3*i)+2] - measurement[(3*i)+2]);
+      residuals[i] = expected[i] - measurement[i];
     }
 
     return true;  // always return true
@@ -181,7 +175,7 @@ struct CbRgbdError
                                      int x)
   {
     /* See ChainError::Create for what these params are. */
-    return ( new ceres::NumericDiffCostFunction<CbRgbdError, ceres::CENTRAL, 3, num_free_params, 6>(
+    return ( new ceres::NumericDiffCostFunction<CbRgbdError, ceres::CENTRAL, 60, num_free_params, 6>(
                  new CbRgbdError(chain, positions, info, offset, root, tip, observations, size, x)));
   }
 
@@ -189,11 +183,11 @@ struct CbRgbdError
   template <int num_free_params>
   static ceres::CostFunction* Create(CbRgbdError * error)
   {
-    return ( new ceres::NumericDiffCostFunction<CbRgbdError, ceres::CENTRAL, 3, num_free_params, 6>(error));
+    return ( new ceres::NumericDiffCostFunction<CbRgbdError, ceres::CENTRAL, 60, num_free_params, 6>(error));
   }
 
   /* stored data */
-  ChainError chain_;
+  CbChainError chain_;
   std::vector<double> observations_;
   double size_;
   int x_;

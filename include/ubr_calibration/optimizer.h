@@ -112,13 +112,13 @@ public:
 
     /* disable torso lift and wrist roll */
     adjustments_["torso_lift_joint"].calibrate = false;
-    adjustments_["shoulder_pan_joint"].calibrate = false;
+    /*adjustments_["shoulder_pan_joint"].calibrate = false;
     adjustments_["shoulder_lift_joint"].calibrate = false;
     adjustments_["upperarm_roll_joint"].calibrate = false;
     adjustments_["elbow_flex_joint"].calibrate = false;
     adjustments_["forearm_roll_joint"].calibrate = false;
     adjustments_["wrist_flex_joint"].calibrate = false;
-    adjustments_["wrist_roll_joint"].calibrate = false;
+    adjustments_["wrist_roll_joint"].calibrate = false;*/
 
     /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] = ALL 0 */
     free_params_ = new double[num_free_params_];
@@ -126,9 +126,9 @@ public:
       free_params_[i] = 0.0;
 
     /* fill in gripper_cb starting points */
-    free_params_[adjustments_["gripper_cb"].x] = 0.07;
+    free_params_[adjustments_["gripper_cb"].x] = 0.07+0.0245;
     free_params_[adjustments_["gripper_cb"].y] = 0.0;
-    free_params_[adjustments_["gripper_cb"].z] = -0.065;
+    free_params_[adjustments_["gripper_cb"].z] = -0.065+0.0245;
     free_params_[adjustments_["gripper_cb"].roll] = 0.0;
     free_params_[adjustments_["gripper_cb"].pitch] = 0.0;
     free_params_[adjustments_["gripper_cb"].yaw] = 0.0;
@@ -153,9 +153,9 @@ public:
 
         for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
         {
-          observations_[(3*observation+j)+0] = data[i].rgbd_observations[j].point.x;
-          observations_[(3*observation+j)+1] = data[i].rgbd_observations[j].point.y;
-          observations_[(3*observation+j)+2] = data[i].rgbd_observations[j].point.z;
+          observations_[(3*(observation+j))+0] = data[i].rgbd_observations[j].point.x;
+          observations_[(3*(observation+j))+1] = data[i].rgbd_observations[j].point.y;
+          observations_[(3*(observation+j))+2] = data[i].rgbd_observations[j].point.z;
           obs.push_back(data[i].rgbd_observations[j].point.x);
           obs.push_back(data[i].rgbd_observations[j].point.y);
           obs.push_back(data[i].rgbd_observations[j].point.z);
@@ -170,19 +170,19 @@ public:
         poses_[(6*block)+2] = projected.p.z();
         axis_magnitude_from_rotation(projected.M, poses_[(6*block)+3], poses_[(6*block)+4], poses_[(6*block)+5]);
 
-        /*        
         if (progress_to_stdout)
-          std::cout << "Global estimates:" << std::endl;
-        */
+        {
+          double roll, pitch, yaw;
+          projected.M.GetRPY(roll, pitch, yaw);
 
-        if (progress_to_stdout)
           std::cout << "Initial estimate of pose (via arm):    " <<
                        poses_[(6*block)+0] << "," <<
                        poses_[(6*block)+1] << "," <<
                        poses_[(6*block)+2] << " (" <<
-                       poses_[(6*block)+3] << "," <<
-                       poses_[(6*block)+4] << "," <<
-                       poses_[(6*block)+5] << ")" << std::endl;
+                       roll << "," <<
+                       pitch << "," <<
+                       yaw << ")" << std::endl;
+        }
 
         /* Create arm residual */
         ceres::CostFunction * cost_function = CbChainError::Create<14>(arm_error);
@@ -194,12 +194,43 @@ public:
         /* Create camera chain error block */
         CbRgbdError * camera_error = new CbRgbdError(camera_chain_, camera_positions, &adjustments_, 14,
                                                      root_frame_, data[i].rgbd_observations[0].header.frame_id,
-                                                     obs, 0.0254, 4);
+                                                     obs, 0.0245, 4);
+
+        if (progress_to_stdout && i == 0)
+        {
+          std::cout << "arm estimate " << block << std::endl;
+
+          /* Project points from checkerboard frame to camera frame */
+          int k = 0;
+          for (size_t y = 0; y < 60/(3*4); ++y)
+          {
+            for (size_t x = 0; x < 4; ++x)
+            {
+              /* Point in the checkerboard frame */
+              KDL::Frame point_ = KDL::Frame::Identity();
+              point_.p.x(x * 0.0245);
+              point_.p.y(0.0);
+              point_.p.z(y * 0.0245);
+
+              /* Transform point to root frame */
+              point_ = projected * point_;
+
+              //std::cout << "  " << point_.p.x() << "," << point_.p.y() << "," << point_.p.z() << std::endl;
+
+              /* Transform point to camera frame */
+              point_ = camera_error->chain_.getChainFK(0).Inverse() * point_;
+
+              std::cout << "  " << point_.p.x() << "," << point_.p.y() << "," << point_.p.z() << std::endl;
+
+              ++k;
+            }
+          }
+        }
 
         /* Reproject camera error for comparison */
-        if (progress_to_stdout)
+        if (progress_to_stdout && i == 0)
         {
-          std::cout << "estimate " << block << std::endl;
+          std::cout << "camera estimate " << block << std::endl;
           double expected[60];
           camera_error->getExpected(0, &poses_[6*block], &expected[0]);
 
@@ -349,6 +380,7 @@ public:
         /* Analyze Observations */
         if (data[i].world_observations[0].header.frame_id == "checkerboard")
         {
+          if (i == 0){
           std::vector<double> obs;
 
           for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
@@ -369,6 +401,7 @@ public:
 
           for (int j = 0; j < 20; ++j)
             std::cout << "  " << expected[3*j] << "," << expected[(3*j)+1] << "," << expected[(3*j)+2] << std::endl;
+          }
 
           // TODO
           observation += data[i].rgbd_observations.size();
@@ -449,12 +482,19 @@ public:
     /* Print final estimates of points */
     for (int i = 0; i < num_blocks_; ++i)
     {
+      double roll, pitch, yaw;
+      KDL::Rotation rot = rotation_from_axis_magnitude(poses_[(6*i)+3],
+                                                       poses_[(6*i)+4],
+                                                       poses_[(6*i)+5]);
+      /* Get roll, pitch, yaw about fixed axis */
+      rot.GetRPY(roll, pitch, yaw);
+
       std::cout << "Final estimate: " << poses_[(6*i)+0] << "," <<
                                          poses_[(6*i)+1] << "," <<
                                          poses_[(6*i)+2] << " (" <<
-                                         poses_[(6*i)+3] << "," <<
-                                         poses_[(6*i)+4] << "," <<
-                                         poses_[(6*i)+5] << ")" << std::endl;
+                                         roll << "," <<
+                                         pitch << "," <<
+                                         yaw << ")" << std::endl;
     }
 
     /* Print final calibration updates */
