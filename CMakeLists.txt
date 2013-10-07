@@ -16,25 +16,31 @@ if (NOT tinyxml_include_dirs)
 endif ()
 
 find_package(orocos_kdl)
-if (${orocos_kdl_FOUND})
-# must by hydro or later, orocos_kdl is a system dependency
-message (STATUS "using orocos-kdl system package")
-find_package(catkin REQUIRED message_generation actionlib cv_bridge roscpp kdl_parser ubr_msgs
-                             std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
-else (${orocos_kdl_FOUND})
-# groovy, orocos_kdl is ros package
-message (STATUS "using orocos-kdl ros package")
-find_package(catkin REQUIRED message_generation actionlib cv_bridge roscpp orocos_kdl kdl_parser ubr_msgs
-                             std_msgs sensor_msgs geometry_msgs rosbag pcl_ros)
-endif (${orocos_kdl_FOUND})
+find_package(Ceres)
+
+find_package(catkin REQUIRED
+  COMPONENTS
+    actionlib
+    cv_bridge
+    geometry_msgs
+    kdl_parser
+    message_generation
+    pcl_ros
+    rosbag
+    roscpp
+    sensor_msgs
+    std_msgs
+    ubr_msgs
+)
 
 add_message_files(FILES CalibrationData.msg)
-generate_messages(DEPENDENCIES std_msgs sensor_msgs geometry_msgs)
+generate_messages(DEPENDENCIES
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+)
 
 catkin_package()
-
-find_package(Ceres)
-if (${Ceres_FOUND})
 
 include_directories(include ${Boost_INCLUDE_DIRS}
                             ${catkin_INCLUDE_DIRS}
@@ -44,6 +50,7 @@ include_directories(include ${Boost_INCLUDE_DIRS}
                             ${orocos_kdl_INCLUDE_DIRS})
 link_directories(${orocos_kdl_LIBRARY_DIRS}) # this is a hack, will eventually be unneeded once orocos-kdl is fixed
 
+# Always build capture
 add_executable(capture src/capture.cpp
                        src/chain_manager.cpp
                        src/led_finder.cpp)
@@ -66,6 +73,7 @@ target_link_libraries(capture_checkerboards ${Boost_LIBRARIES}
 add_dependencies(capture_checkerboards ubr_calibration_gencpp
                                        ubr_msgs_gencpp)
 
+if (${Ceres_FOUND})
 add_executable(calibrate src/calibrate.cpp
                          src/update_urdf.cpp)
 target_link_libraries(calibrate ${Boost_LIBRARIES}
