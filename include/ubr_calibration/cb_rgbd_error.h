@@ -109,11 +109,11 @@ struct CbRgbdError
         /* Point in the checkerboard frame */
         KDL::Frame point_ = KDL::Frame::Identity();
         point_.p.x(x * size_);
-        point_.p.y(y * size_);
-        point_.p.z(0);
+        point_.p.y(0.0);
+        point_.p.z(y * size_);
 
         /* Transform point to camera frame */
-        point_ = p_out.Inverse() * checkerboard.Inverse() * point_;
+        point_ = p_out.Inverse() * checkerboard * point_;
 
         /* Fill in expected */
         expected[(3*i)+0] = point_.p.x();
@@ -137,6 +137,32 @@ struct CbRgbdError
       measurement[(3*i)+1] = observations_[(3*i)+1];  // y
       measurement[(3*i)+2] = observations_[(3*i)+2];  // z
     }
+  }
+
+  /**
+   *  \brief Used in analysis at end of program, find the position of
+   *         the observed point in the root frame.
+   */
+  inline bool getEstimatedGlobal(const double* const free_params,
+                                 double* estimate,
+                                 int observation = 0)
+  {
+    if ((3*observation)+2 >= observations_.size())
+      return false; 
+    KDL::Frame point_ = KDL::Frame::Identity();
+    point_.p.x(observations_[(3*observation)+0]);
+    point_.p.y(observations_[(3*observation)+1]);
+    point_.p.z(observations_[(3*observation)+2]);
+
+    /* Compute FK through the chain. */
+    KDL::Frame p_out = chain_.getChainFK(free_params);
+
+    /* Transform point_ from camera_frame_ into root_frame_ and return it. */
+    point_ = p_out * point_;
+    estimate[0] = point_.p.x();
+    estimate[1] = point_.p.y();
+    estimate[2] = point_.p.z();
+    return true;
   }
 
   /**

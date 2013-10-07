@@ -112,13 +112,26 @@ public:
 
     /* disable torso lift and wrist roll */
     adjustments_["torso_lift_joint"].calibrate = false;
+    adjustments_["shoulder_pan_joint"].calibrate = false;
+    adjustments_["shoulder_lift_joint"].calibrate = false;
+    adjustments_["upperarm_roll_joint"].calibrate = false;
+    adjustments_["elbow_flex_joint"].calibrate = false;
+    adjustments_["forearm_roll_joint"].calibrate = false;
+    adjustments_["wrist_flex_joint"].calibrate = false;
+    adjustments_["wrist_roll_joint"].calibrate = false;
 
     /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] = ALL 0 */
     free_params_ = new double[num_free_params_];
     for (int i = 0; i < num_free_params_; ++i)
       free_params_[i] = 0.0;
 
-    // TODO: fill in gripper_cb starting points
+    /* fill in gripper_cb starting points */
+    free_params_[adjustments_["gripper_cb"].x] = 0.07;
+    free_params_[adjustments_["gripper_cb"].y] = 0.0;
+    free_params_[adjustments_["gripper_cb"].z] = -0.065;
+    free_params_[adjustments_["gripper_cb"].roll] = 0.0;
+    free_params_[adjustments_["gripper_cb"].pitch] = 0.0;
+    free_params_[adjustments_["gripper_cb"].yaw] = 0.0;
 
     /* Houston, we have a problem.. */
     problem_ = new ceres::Problem();
@@ -151,11 +164,25 @@ public:
         CbChainError * arm_error = new CbChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, "gripper_link");
 
         /* Point is a reprojection through arm */
-        KDL::Frame projected = arm_error->getChainFK(0);
+        KDL::Frame projected = arm_error->getChainFK(free_params_);
         poses_[(6*block)+0] = projected.p.x();
         poses_[(6*block)+1] = projected.p.y();
         poses_[(6*block)+2] = projected.p.z();
         axis_magnitude_from_rotation(projected.M, poses_[(6*block)+3], poses_[(6*block)+4], poses_[(6*block)+5]);
+
+        /*        
+        if (progress_to_stdout)
+          std::cout << "Global estimates:" << std::endl;
+        */
+
+        if (progress_to_stdout)
+          std::cout << "Initial estimate of pose (via arm):    " <<
+                       poses_[(6*block)+0] << "," <<
+                       poses_[(6*block)+1] << "," <<
+                       poses_[(6*block)+2] << " (" <<
+                       poses_[(6*block)+3] << "," <<
+                       poses_[(6*block)+4] << "," <<
+                       poses_[(6*block)+5] << ")" << std::endl;
 
         /* Create arm residual */
         ceres::CostFunction * cost_function = CbChainError::Create<14>(arm_error);
@@ -167,7 +194,37 @@ public:
         /* Create camera chain error block */
         CbRgbdError * camera_error = new CbRgbdError(camera_chain_, camera_positions, &adjustments_, 14,
                                                      root_frame_, data[i].rgbd_observations[0].header.frame_id,
-                                                     obs, 0.0245, 4);
+                                                     obs, 0.0254, 4);
+
+        /* Reproject camera error for comparison */
+        if (progress_to_stdout)
+        {
+          std::cout << "estimate " << block << std::endl;
+          double expected[60];
+          camera_error->getExpected(0, &poses_[6*block], &expected[0]);
+
+          for (int i = 0; i < 20; ++i)
+          {
+            /*
+            double reprojection[3];
+            if (!camera_error->getEstimatedGlobal(0, &reprojection[0], i))
+              break;
+
+            KDL::Frame pose(KDL::Frame::Identity());
+            pose.p.x(0.0245 * ((i%4)+1));
+            pose.p.y(0.0245 * ((int)(i/4)+1));
+
+            pose = projected * pose;
+            std::cout << "  Initial estimate of point (via arm)   :" << pose.p.x() <<
+                         "," << pose.p.y() << "," << pose.p.z() << std::endl;
+
+            std::cout << "  Initial estimate of point (via camera):" << reprojection[0] <<
+                         "," << reprojection[1] << "," << reprojection[2] << std::endl;
+            */
+
+            std::cout << "  " << expected[3*i] << "," << expected[(3*i)+1] << "," << expected[(3*i)+2] << std::endl;
+          }
+        }
 
         /* Create camera residual */
         cost_function = CbRgbdError::Create<7>(camera_error);
@@ -248,7 +305,7 @@ public:
             camera_error->getEstimatedGlobal(0, &reprojection[0]);
 
             if (progress_to_stdout)
-              std::cout << "Intial estimate of point (via camera): " << reprojection[0] <<
+              std::cout << "Initial estimate of point (via camera): " << reprojection[0] <<
                            "," << reprojection[1] << "," << reprojection[2] << std::endl;
           }
 
@@ -292,6 +349,27 @@ public:
         /* Analyze Observations */
         if (data[i].world_observations[0].header.frame_id == "checkerboard")
         {
+          std::vector<double> obs;
+
+          for (size_t j = 0; j < data[i].rgbd_observations.size(); ++j)
+          {
+            obs.push_back(data[i].rgbd_observations[j].point.x);
+            obs.push_back(data[i].rgbd_observations[j].point.y);
+            obs.push_back(data[i].rgbd_observations[j].point.z);
+          }
+
+          std::cout << "estimate " << block << std::endl;
+          double expected[60];
+
+          CbRgbdError * camera_error = new CbRgbdError(camera_chain_, camera_positions, &adjustments_, 14,
+                                                     root_frame_, data[i].rgbd_observations[0].header.frame_id,
+                                                     obs, 0.0254, 4);
+
+          camera_error->getExpected(0, &poses_[6*block], &expected[0]);
+
+          for (int j = 0; j < 20; ++j)
+            std::cout << "  " << expected[3*j] << "," << expected[(3*j)+1] << "," << expected[(3*j)+2] << std::endl;
+
           // TODO
           observation += data[i].rgbd_observations.size();
           ++block;
@@ -373,7 +451,10 @@ public:
     {
       std::cout << "Final estimate: " << poses_[(6*i)+0] << "," <<
                                          poses_[(6*i)+1] << "," <<
-                                         poses_[(6*i)+2] << std::endl;
+                                         poses_[(6*i)+2] << " (" <<
+                                         poses_[(6*i)+3] << "," <<
+                                         poses_[(6*i)+4] << "," <<
+                                         poses_[(6*i)+5] << ")" << std::endl;
     }
 
     /* Print final calibration updates */
