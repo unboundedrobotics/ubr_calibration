@@ -108,6 +108,7 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
       msg->rgbd_observations[i] = rgbd;
       msg->world_observations[i] = world;
     }
+    pcl::toROSMsg(*cloud_ptr_, msg->cloud);
 
     /* Found all points */
     return true;
