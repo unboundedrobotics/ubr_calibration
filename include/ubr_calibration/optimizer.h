@@ -47,7 +47,8 @@ public:
       delete problem_;
   }
 
-  /** \brief Run optimization.
+  /**
+   *  \brief Run optimization.
    *  \param data The data to be used for the optimization. Typically parsed
    *         from bag file, or loaded over some topic subscriber.
    *  \param progress_to_stdout If true, Ceres optimizer will output info to
@@ -64,12 +65,17 @@ public:
     }
 
     /* Populate the chains */
-    if(!tree_.getChain(root_frame_, led_frame_, arm_chain_))
+    if(!tree_.getChain(root_frame_, "gripper_link", arm_chain_))
     {
       std::cerr << "Failed to get arm chain" << std::endl;
       return -1;
     }
-    if(!tree_.getChain(root_frame_, data[2].rgbd_observations[0].header.frame_id, camera_chain_))
+    if(!tree_.getChain(root_frame_, led_frame_, led_chain_))
+    {
+      std::cerr << "Failed to get arm-led chain" << std::endl;
+      return -1;
+    }
+    if(!tree_.getChain(root_frame_, data[0].rgbd_observations[0].header.frame_id, camera_chain_))
     {
       std::cerr << "Failed to get camera chain" << std::endl;
       return -1;
@@ -102,9 +108,10 @@ public:
     adjustments_["forearm_roll_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["wrist_flex_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["wrist_roll_joint"] = FrameCalibrationData(num_free_params_++);
-    adjustments_["gripper_cb"] = FrameCalibrationData(num_free_params_++, num_free_params_++,
+    adjustments_["gripper_cb_joint"] = FrameCalibrationData(num_free_params_++, num_free_params_++,
               num_free_params_++, num_free_params_++, num_free_params_++, num_free_params_++);
     adjustments_["head_pan_joint"] = FrameCalibrationData(num_free_params_++);
+    //adjustments_["head_pan_joint"].z = num_free_params_++;
     adjustments_["head_tilt_joint"] = FrameCalibrationData(num_free_params_++);
     adjustments_["head_camera_rgb_joint"] =
       FrameCalibrationData(num_free_params_++, num_free_params_++, num_free_params_++, -1, -1, num_free_params_++);
@@ -119,19 +126,16 @@ public:
     adjustments_["forearm_roll_joint"].calibrate = false;
     adjustments_["wrist_flex_joint"].calibrate = false;
     adjustments_["wrist_roll_joint"].calibrate = false;*/
+    //adjustments_["gripper_cb_joint"].calibrate = false;
+    adjustments_["gripper_cb_joint"].y = -1;
+    adjustments_["gripper_cb_joint"].roll = -1;
+    adjustments_["gripper_cb_joint"].yaw = -1;
+    //adjustments_["head_camera_rgb_joint"].z = -1;
 
     /* free parameters = [arm joint angle offsets] + [camera joint angle offsets] + [free angles] = ALL 0 */
     free_params_ = new double[num_free_params_];
     for (int i = 0; i < num_free_params_; ++i)
       free_params_[i] = 0.0;
-
-    /* fill in gripper_cb starting points */
-    free_params_[adjustments_["gripper_cb"].x] = 0.07+0.0245;
-    free_params_[adjustments_["gripper_cb"].y] = 0.0;
-    free_params_[adjustments_["gripper_cb"].z] = -0.065+0.0245;
-    free_params_[adjustments_["gripper_cb"].roll] = 0.0;
-    free_params_[adjustments_["gripper_cb"].pitch] = 0.0;
-    free_params_[adjustments_["gripper_cb"].yaw] = 0.0;
 
     /* Houston, we have a problem.. */
     problem_ = new ceres::Problem();
@@ -196,6 +200,7 @@ public:
                                                      root_frame_, data[i].rgbd_observations[0].header.frame_id,
                                                      obs, 0.0245, 4);
 
+#if 0
         if (progress_to_stdout && i == 0)
         {
           std::cout << "arm estimate " << block << std::endl;
@@ -226,6 +231,7 @@ public:
             }
           }
         }
+#endif
 
         /* Reproject camera error for comparison */
         if (progress_to_stdout && i == 0)
@@ -253,7 +259,8 @@ public:
                          "," << reprojection[1] << "," << reprojection[2] << std::endl;
             */
 
-            std::cout << "  " << expected[3*i] << "," << expected[(3*i)+1] << "," << expected[(3*i)+2] << std::endl;
+            std::cout << "  " << expected[3*i] << "," << expected[(3*i)+1] << "," << expected[(3*i)+2] << 
+                         "  \t" << obs[3*i] << "," << obs[(3*i)+1] << "," << obs[(3*i)+2] << std::endl;
           }
         }
 
@@ -283,7 +290,7 @@ public:
           if (data[i].world_observations[j].header.frame_id == led_frame_)
           {
             /* Create an arm chain error block */
-            ChainError * arm_error = new ChainError(arm_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
+            ChainError * arm_error = new ChainError(led_chain_, arm_positions, &adjustments_, 0, root_frame_, led_frame_);
 
             /* Point is a reprojection through arm */
             KDL::Frame projected = arm_error->getChainFK(0);
@@ -324,7 +331,7 @@ public:
           }
 
           /* Create camera chain error block */
-          RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 8,
+          RgbdError * camera_error = new RgbdError(camera_chain_, camera_positions, &adjustments_, 7,
                                                    root_frame_, data[i].rgbd_observations[j].header.frame_id,
                                                    observations_[(observation*3)+0],
                                                    observations_[(observation*3)+1],
@@ -358,7 +365,9 @@ public:
 
     /* Setup the actual optimization */
     ceres::Solver::Options options;
-    options.linear_solver_type = ceres::DENSE_SCHUR;
+    options.use_nonmonotonic_steps = true;
+    options.function_tolerance = 1e-10;
+    options.linear_solver_type = ceres::DENSE_QR; //ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = progress_to_stdout;
 
     std::cout << "\nSolver output:" << std::endl;
@@ -595,6 +604,7 @@ private:
 
   KDL::Tree tree_;
   KDL::Chain arm_chain_;
+  KDL::Chain led_chain_;
   KDL::Chain camera_chain_;
 
   int num_blocks_;

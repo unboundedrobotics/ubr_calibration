@@ -68,9 +68,11 @@ struct CbRgbdError
     getExpected(free_params, pose, &expected[0]);
     getMeasurement(free_params, &measurement[0]);
 
-    for (size_t i = 0; i < observations_.size(); ++i)
+    for (size_t i = 0; i < observations_.size()/3; ++i)
     {
-      residuals[i] = expected[i] - measurement[i];
+      residuals[(3*i)+0] = expected[(3*i)+0] - measurement[(3*i)+0];  // x
+      residuals[(3*i)+1] = expected[(3*i)+1] - measurement[(3*i)+1];  // y
+      residuals[(3*i)+2] = expected[(3*i)+2] - measurement[(3*i)+2];  // z
     }
 
     return true;  // always return true
@@ -142,7 +144,8 @@ struct CbRgbdError
                                  int observation = 0)
   {
     if ((3*observation)+2 >= observations_.size())
-      return false; 
+      return false;
+
     KDL::Frame point_ = KDL::Frame::Identity();
     point_.p.x(observations_[(3*observation)+0]);
     point_.p.y(observations_[(3*observation)+1]);
@@ -187,7 +190,7 @@ struct CbRgbdError
   }
 
   /* stored data */
-  CbChainError chain_;
+  ChainError chain_;
   std::vector<double> observations_;
   double size_;
   int x_;
