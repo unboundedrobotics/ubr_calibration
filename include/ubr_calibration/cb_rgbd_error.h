@@ -70,8 +70,8 @@ struct CbRgbdError
 
     for (size_t i = 0; i < observations_.size()/3; ++i)
     {
-      residuals[(3*i)+0] = expected[(3*i)+0] - measurement[(3*i)+0];  // x
-      residuals[(3*i)+1] = expected[(3*i)+1] - measurement[(3*i)+1];  // y
+      residuals[(3*i)+0] = 50.0 * (expected[(3*i)+0] - measurement[(3*i)+0]);  // x
+      residuals[(3*i)+1] = 50.0 * (expected[(3*i)+1] - measurement[(3*i)+1]);  // y
       residuals[(3*i)+2] = expected[(3*i)+2] - measurement[(3*i)+2];  // z
     }
 

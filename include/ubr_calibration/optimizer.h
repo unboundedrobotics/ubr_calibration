@@ -116,16 +116,17 @@ public:
     adjustments_["head_camera_rgb_joint"] =
       FrameCalibrationData(num_free_params_++, num_free_params_++, num_free_params_++, -1, -1, num_free_params_++);
     adjustments_["head_camera_rgb_optical_joint"] = FrameCalibrationData(-1, -1, -1, -1, -1, num_free_params_++);
+    adjustments_["head_camera_rgb_optical_joint"].calibrate = false;
 
     /* disable torso lift and wrist roll */
     adjustments_["torso_lift_joint"].calibrate = false;
-    /*adjustments_["shoulder_pan_joint"].calibrate = false;
+    adjustments_["shoulder_pan_joint"].calibrate = false;
     adjustments_["shoulder_lift_joint"].calibrate = false;
     adjustments_["upperarm_roll_joint"].calibrate = false;
     adjustments_["elbow_flex_joint"].calibrate = false;
     adjustments_["forearm_roll_joint"].calibrate = false;
     adjustments_["wrist_flex_joint"].calibrate = false;
-    adjustments_["wrist_roll_joint"].calibrate = false;*/
+    adjustments_["wrist_roll_joint"].calibrate = false;
     //adjustments_["gripper_cb_joint"].calibrate = false;
     adjustments_["gripper_cb_joint"].y = -1;
     adjustments_["gripper_cb_joint"].roll = -1;
@@ -368,6 +369,7 @@ public:
     options.use_nonmonotonic_steps = true;
     options.function_tolerance = 1e-10;
     options.linear_solver_type = ceres::DENSE_QR; //ceres::DENSE_SCHUR;
+    options.max_num_iterations = 1000;
     options.minimizer_progress_to_stdout = progress_to_stdout;
 
     std::cout << "\nSolver output:" << std::endl;
