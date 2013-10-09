@@ -2,6 +2,9 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 0.2.3 (2013-10-08)
 ------------------
 * add point cloud and world observations to message
