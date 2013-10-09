@@ -2,6 +2,12 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* add point cloud and world observations to message
+* add support for checkerboards
+* allow frame corrections on active joints
+
 0.2.2 (2013-09-25)
 ------------------
 
