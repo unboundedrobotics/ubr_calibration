@@ -79,15 +79,15 @@ int main(int argc, char **argv)
   js.name.push_back("wrist_flex_joint");
   js.name.push_back("wrist_roll_joint");
   js.name.push_back("head_tilt_joint");
-  js.position.push_back(1.75);
+  js.position.push_back(-1.75);
   js.position.push_back(0.0);
   js.position.push_back(0.0);
-  js.position.push_back(-0.90);
+  js.position.push_back(0.90);
   js.position.push_back(-1.40);
   js.position.push_back(0.0);
   js.position.push_back(0.0);
   js.position.push_back(0.0);
-  js.position.push_back(-0.55);
+  js.position.push_back(0.55);
 
   /* Get ground plane with head down close to base */
   chain_manager_.moveToState(js);
