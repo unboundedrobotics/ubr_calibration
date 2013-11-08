@@ -2,6 +2,10 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* update ground pose
+
 0.2.10 (2013-10-20)
 -------------------
 
