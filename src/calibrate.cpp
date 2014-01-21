@@ -3,6 +3,7 @@
  * Author: Michael Ferguson
  */
 
+#include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <rosbag/query.h>
