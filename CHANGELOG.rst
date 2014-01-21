@@ -2,8 +2,8 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.17 (2014-01-21)
+-------------------
 * fix compile issue with newer ros_comm 1.9.53
 
 0.2.16 (2014-01-15)
