@@ -2,6 +2,9 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 0.2.18 (2014-03-26)
 -------------------
 
