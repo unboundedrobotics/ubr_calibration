@@ -54,6 +54,7 @@ include_directories(include ${Boost_INCLUDE_DIRS}
 link_directories(${orocos_kdl_LIBRARY_DIRS}) # this is a hack, will eventually be unneeded once orocos-kdl is fixed
 
 if (${Ceres_FOUND})
+
 add_executable(calibrate src/calibrate.cpp
                          src/calibration_offset_parser.cpp
                          src/chain_manager.cpp
@@ -72,8 +73,13 @@ add_dependencies(calibrate ubr_calibration_gencpp
 add_subdirectory(test)
 
 install(TARGETS calibrate
-        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(DIRECTORY launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
 else (${Ceres_FOUND})
+
   MESSAGE(WARNING "Could not locate Ceres. ubr_calibration will not be built.")
+
 endif(${Ceres_FOUND})
