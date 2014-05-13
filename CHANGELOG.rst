@@ -2,6 +2,11 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* fix python install
+* Contributors: Michael Ferguson
+
 0.2.22 (2014-05-12)
 -------------------
 * Refactor calibration
