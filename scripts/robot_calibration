@@ -41,18 +41,18 @@ import yaml
 from lxml import etree
 from time import strftime
 
-def stop_drivers():
-    return (subprocess.call(["service", "ubr1-indigo", "stop"]) == 0)
+def stop_drivers(rosdistro):
+    return (subprocess.call(["service", "ubr1-%s" % rosdistro, "stop"]) == 0)
 
 
-def start_drivers():
-    return (subprocess.call(["service", "ubr1-indigo", "start"]) == 0)
+def start_drivers(rosdistro):
+    return (subprocess.call(["service", "ubr1-%s" % rosdistro, "start"]) == 0)
 
 
-def restart_drivers():
-    ok = stop_drivers()
+def restart_drivers(rosdistro):
+    ok = stop_drivers(rosdistro)
     time.sleep(1.0)  # nodelet unload/load needs time
-    return (ok and start_drivers())
+    return (ok and start_drivers(rosdistro))
 
 
 ## @brief Updates the robot launch file
@@ -118,7 +118,7 @@ def get_calibration_dict(directory):
     return calibration
 
 
-def move_calibration(current_directory, new_directory):
+def move_calibration(current_directory, new_directory, rosdistro):
     calibration = get_calibration_dict(current_directory)
 
     # install urdf, depth, rgb files
@@ -126,22 +126,32 @@ def move_calibration(current_directory, new_directory):
         copy_file(current_directory, new_directory, calibration[name])
 
     # update the robot.launch
-    update_robot_launch("/etc/ros/indigo/robot.launch", calibration, new_directory)
+    update_robot_launch("/etc/ros/%s/robot.launch" % rosdistro, calibration, new_directory)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tool for manipulating robot calibration settings")
-    parser.add_argument("--backup", help="Back up the current calibration", action="store_true")
+    #parser.add_argument("--backup", help="Back up the current calibration", action="store_true")
     parser.add_argument("--install", help="Load new calibration (restarts drivers)", action="store_true")
-    parser.add_argument("--test", help="Test a calibration without installing it (restarts drivers)", action="store_true")
+    #parser.add_argument("--test", help="Test a calibration without installing it (restarts drivers)", action="store_true")
     parser.add_argument("--reset", help="Reset the calibration back to factory defaults (restarts drivers)", action="store_true")
     parser.add_argument("--date", help="Get the timestamp of the current calibration", action="store_true")
     parser.add_argument("--calibrate", help="Generate a new calibration", action="store_true")
     parser.add_argument("--directory", help="Directory to load calibration from or backup to", default="/tmp")
     args = parser.parse_args()
 
+    # Get rosdistro without using any ROS tools (which are not available as sudo)
+    path = os.path.realpath(__file__).split('/')
+    if "indigo" in path:
+        rosdistro = "indigo"
+    elif "hydro" in path:
+        rosdistro = "hydro"
+    else:
+        print("Unable to detect rosdistro, is a roscore running?")
+        exit(-1)
+
     if args.date:
-        launch_xml = etree.parse("/etc/ros/indigo/robot.launch")
+        launch_xml = etree.parse("/etc/ros/%s/robot.launch" % rosdistro)
         for child in launch_xml.getroot():
             if child.tag == "param" and child.get("name") == "calibration_date":
                 print(child.get("value"))
@@ -149,21 +159,20 @@ if __name__ == "__main__":
         print("Calibration date not found in robot.launch")
         exit(-1)
 
-    if args.backup:
-        # TODO: store to directory using move_calibration
-        print("This command is not yet supported")
-        exit(0)
+    #if args.backup:
+        # TODO: implement backing up of a calibration (reverse edit the robot.launch)
+        #exit(0)
 
     if args.install:
         # Test permissions (but only show our clean error message)
         FNULL = open(os.devnull, 'w')
-        if subprocess.call(["touch", "/etc/ros/indigo/robot.launch"], stderr=FNULL) != 0:
-            print("\nIt appears you do not have permission to edit the /etc/ros/indigo directory.")
+        if subprocess.call(["touch", "/etc/ros/%s/robot.launch" % rosdistro], stderr=FNULL) != 0:
+            print("\nIt appears you do not have permission to edit the /etc/ros/%s directory." % rosdistro)
             print("Be sure to run robot_calibration with 'sudo -E' to preserve environment\n")
             exit(-1)
         # Ok, go ahead
-        move_calibration(args.directory, "/etc/ros/indigo")
-        if not restart_drivers():
+        move_calibration(args.directory, "/etc/ros/%s" % rosdistro, rosdistro)
+        if not restart_drivers(rosdistro):
             print("\nWARNING: drivers may not have restarted\n")
         exit(0)
 
@@ -177,14 +186,13 @@ if __name__ == "__main__":
             print("Be sure to run robot_calibration with 'sudo -E' to preserve environment\n")
             exit(-1)
         # Reset the robot.launch to factory defaults
-        copy_file(os.path.join(bringup, "launch"), "/etc/ros/indigo", "robot.launch")
-        restart_drivers()
+        copy_file(os.path.join(bringup, "launch"), "/etc/ros/%s" % rosdistro, "robot.launch")
+        restart_drivers(rosdistro)
         exit(0)
 
-    if args.test:
-        # TODO stop_drivers()
-        # TODO: start local launch file
-        exit(0)
+    #if args.test:
+        # TODO implement test mode (stop drivers, create local launch and go)
+        #exit(0)
 
     if args.calibrate:
         try:
