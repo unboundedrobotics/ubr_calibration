@@ -1,7 +1,7 @@
 <launch>
 
   <node pkg="ubr_calibration" type="calibrate" name="calibrate"
-        args="/tmp/ubr_calibration/calibration_data.bag"
+        args="--from-bag /tmp/ubr_calibration/calibration_data.bag"
         output="screen" required="true">
   </node>
   

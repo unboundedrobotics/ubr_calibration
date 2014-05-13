@@ -1,9 +1,24 @@
 /*
- * Copyright 2013 Unbounded Robotics Inc.
+ * Copyright 2013-2014 Unbounded Robotics Inc.
  * Author: Michael Ferguson
  */
 
-#include <ubr_calibration/checkerboard_finder.h>
+#include <ubr_calibration/capture/checkerboard_finder.h>
+
+namespace ubr_calibration
+{
+
+CheckerboardFinder::CheckerboardFinder(ros::NodeHandle & n) : 
+  FeatureFinder(n), waiting_(false)
+{
+  subscriber_ = n.subscribe("/head_camera/depth_registered/points",
+                            1,
+                            &CheckerboardFinder::cameraCallback,
+                            this);
+
+  n.param<int>("checkerboard_finder_points_x", points_x_, 4);
+  n.param<int>("checkerboard_finder_points_y", points_y_, 5);
+}
 
 void CheckerboardFinder::cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
 {
@@ -14,41 +29,42 @@ void CheckerboardFinder::cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>:
   }
 }
 
-/* Returns true if we got a message, false if we timeout. */
+// Returns true if we got a message, false if we timeout
 bool CheckerboardFinder::waitForCloud()
 {
   waiting_ = true;
   int count = 0;
-  while (waiting_ && count < 20)
+  while (waiting_ && (++count < 20))
+  {
     ros::Duration(0.1).sleep();
+  }
   return !waiting_;
 }
 
-bool CheckerboardFinder::findCheckerboard(ubr_calibration::CalibrationData * msg,
-                                          int points_x,
-                                          int points_y)
+bool CheckerboardFinder::find(ubr_calibration::CalibrationData * msg)
 {
-  /* Try up to 50 frames */
+  // Try up to 50 frames
   for (int i = 0; i < 50; ++i)
   {
-    if (findInternal(msg, points_x, points_y))
+    if (findInternal(msg))
       return true;
   }
   return false;
 }
 
-bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
-                                      int points_x,
-                                      int points_y)
+bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg)
 {
   geometry_msgs::PointStamped rgbd;
   geometry_msgs::PointStamped world;
 
-  /* Get cloud */
+  // Get cloud
   if(!waitForCloud())
+  {
+    ROS_ERROR("No point cloud data");
     return false;
+  }
 
-  /* Get an OpenCV image from the cloud */
+  // Get an OpenCV image from the cloud
   cv_bridge::CvImagePtr bridge;
   sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
   pcl_broke_again::toROSMsg (*cloud_ptr_, *image_msg);
@@ -62,10 +78,10 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
     return false;
   }
 
-  /* Find checkerboard */
+  // Find checkerboard
   std::vector<cv::Point2f> points;
-  points.resize(points_x * points_y);
-  cv::Size checkerboard_size(points_x, points_y);
+  points.resize(points_x_ * points_y_);
+  cv::Size checkerboard_size(points_x_, points_y_);
   int found = cv::findChessboardCorners(bridge->image, checkerboard_size,
                                         points, CV_CALIB_CB_ADAPTIVE_THRESH);
 
@@ -73,30 +89,30 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
   {
     ROS_INFO("Found the checkboard");
 
-    /* Set msg size */
-    msg->rgbd_observations.resize(points_x * points_y);
-    msg->world_observations.resize(points_x * points_y);
+    // Set msg size
+    msg->rgbd_observations.resize(points_x_ * points_y_);
+    msg->world_observations.resize(points_x_ * points_y_);
 
-    /* Fill in the headers */
+    // Fill in the headers
     rgbd.header.seq = cloud_ptr_->header.seq;
     rgbd.header.frame_id = cloud_ptr_->header.frame_id;
     rgbd.header.stamp.fromNSec(cloud_ptr_->header.stamp * 1e3);  // from pcl_conversion
 
     world.header.frame_id = "checkerboard";
 
-    /* Fill in message */
+    // Fill in message
     for (size_t i = 0; i < points.size(); ++i)
     {
-      world.point.x = i / points_x;
-      world.point.y = i % points_x;
+      world.point.x = i / points_x_;
+      world.point.y = i % points_x_;
 
-      /* Get 3d point */
+      // Get 3d point
       int index = (int)(points[i].y) * cloud_ptr_->width + (int)(points[i].x);
       rgbd.point.x = cloud_ptr_->points[index].x;
       rgbd.point.y = cloud_ptr_->points[index].y;
       rgbd.point.z = cloud_ptr_->points[index].z;
 
-      /* Do not accept NANs */
+      // Do not accept NANs
       if (isnan(rgbd.point.x) ||
           isnan(rgbd.point.y) ||
           isnan(rgbd.point.z))
@@ -110,9 +126,11 @@ bool CheckerboardFinder::findInternal(ubr_calibration::CalibrationData * msg,
     }
     pcl::toROSMsg(*cloud_ptr_, msg->cloud);
 
-    /* Found all points */
+    // Found all points
     return true;
   }
 
   return false;
 }
+
+}  // namespace ubr_calibration

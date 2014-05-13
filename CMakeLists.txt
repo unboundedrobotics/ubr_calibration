@@ -21,6 +21,7 @@ find_package(Ceres)
 find_package(catkin REQUIRED
   COMPONENTS
     actionlib
+    camera_calibration_parsers
     cv_bridge
     geometry_msgs
     kdl_parser
@@ -33,7 +34,9 @@ find_package(catkin REQUIRED
     ubr_msgs
 )
 
-add_message_files(FILES CalibrationData.msg)
+catkin_python_setup()
+
+add_message_files(FILES CalibrationData.msg DepthCameraInfo.msg)
 generate_messages(DEPENDENCIES
   geometry_msgs
   sensor_msgs
@@ -50,42 +53,25 @@ include_directories(include ${Boost_INCLUDE_DIRS}
                             ${orocos_kdl_INCLUDE_DIRS})
 link_directories(${orocos_kdl_LIBRARY_DIRS}) # this is a hack, will eventually be unneeded once orocos-kdl is fixed
 
-# Always build capture
-add_executable(capture src/capture.cpp
-                       src/chain_manager.cpp
-                       src/led_finder.cpp)
-target_link_libraries(capture ${Boost_LIBRARIES}
-                              ${catkin_LIBRARIES}
-                              ${CERES_LIBRARIES}
-                              ${OpenCV_LIBRARIES}  # visualization only
-                              ${PCL_LIBRARIES})
-add_dependencies(capture ubr_calibration_gencpp
-                         ubr_msgs_gencpp)
-
-add_executable(capture_checkerboards src/capture_checkerboards.cpp
-                                     src/chain_manager.cpp
-                                     src/checkerboard_finder.cpp)
-target_link_libraries(capture_checkerboards ${Boost_LIBRARIES}
-                                            ${catkin_LIBRARIES}
-                                            ${CERES_LIBRARIES}
-                                            ${OpenCV_LIBRARIES}
-                                            ${PCL_LIBRARIES})
-add_dependencies(capture_checkerboards ubr_calibration_gencpp
-                                       ubr_msgs_gencpp)
-
 if (${Ceres_FOUND})
 add_executable(calibrate src/calibrate.cpp
-                         src/update_urdf.cpp)
+                         src/calibration_offset_parser.cpp
+                         src/chain_manager.cpp
+                         src/checkerboard_finder.cpp
+                         src/led_finder.cpp
+                         src/models.cpp)
 target_link_libraries(calibrate ${Boost_LIBRARIES}
                                 ${catkin_LIBRARIES}
                                 ${CERES_LIBRARIES}
+                                ${OpenCV_LIBRARIES}  # visualization only
                                 ${tinyxml_LIBRARIES}
                                 ${orocos_kdl_LIBRARIES})
-add_dependencies(calibrate ubr_calibration_gencpp)
+add_dependencies(calibrate ubr_calibration_gencpp
+                           ubr_msgs_gencpp)
 
 add_subdirectory(test)
 
-install(TARGETS capture calibrate capture_checkerboards
+install(TARGETS calibrate
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 else (${Ceres_FOUND})

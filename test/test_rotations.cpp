@@ -1,5 +1,8 @@
-#include <ubr_calibration/chain_functions.h>
+#include <ubr_calibration/models/chain.h>
 #include <gtest/gtest.h>
+
+using ubr_calibration::rotation_from_axis_magnitude;
+using ubr_calibration::axis_magnitude_from_rotation;
 
 TEST(AngleTest, rotationsOK)
 {

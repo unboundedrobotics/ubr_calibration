@@ -20,6 +20,7 @@ class CapturePoses:
         bag = rosbag.Bag('calibration_poses.bag', 'w')
 
         # put samples in
+        count = 0
         while not rospy.is_shutdown():
             print('Move arm/head to a new sample position:  (type "exit" to quit and save data)')
             resp = raw_input('press <enter>')
@@ -31,8 +32,9 @@ class CapturePoses:
                     continue
                 # save a pose
                 bag.write('calibration_joint_states', self.last_state_)
+                print("Saving pose %d" % count)
+                count += 1
         bag.close()
-            
 
     def stateCb(self, msg):
         """ Callback for joint_states messages """

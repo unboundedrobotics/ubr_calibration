@@ -3,12 +3,14 @@
  * Author: Michael Ferguson
  */
 
-#ifndef UBR_CALIBRATION_LED_FINDER_H_
-#define UBR_CALIBRATION_LED_FINDER_H_
+#ifndef UBR_CALIBRATION_CAPTURE_LED_FINDER_H_
+#define UBR_CALIBRATION_CAPTURE_LED_FINDER_H_
 
 #include <ros/ros.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
+#include <ubr_calibration/capture/feature_finder.h>
+
 #include <tf/transform_listener.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
@@ -19,53 +21,32 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
+namespace ubr_calibration
+{
+
 typedef actionlib::SimpleActionClient<ubr_msgs::GripperLedCommandAction> LedClient;
 
 /**
  *  \brief This class processes the point cloud input to find the LED
  */
-class LedFinder
+class LedFinder : public FeatureFinder
 {
 public:
-  LedFinder(ros::NodeHandle & n) :
-    client_("/gripper_led_action", true),
-    waiting_(false)
-  {
-    subscriber_ = n.subscribe("/head_camera/depth_registered/points", 1, &LedFinder::cameraCallback, this);
-    ROS_INFO("Waiting for gripper_led_action...");
-    client_.waitForServer();
-
-    publisher_ = n.advertise<geometry_msgs::PointStamped>("led_point", 10);
-
-    // TODO: load these from params
-    threshold_ = 1000;
-    max_iterations_ = 50;
-
-    output_debug_image_ = false;
-    if (output_debug_image_)
-      cv::namedWindow("led_finder");
-  }
+  LedFinder(ros::NodeHandle & n);
 
   /**
    * \brief Attempts to find the led in incoming data.
    * \param msg CalibrationData instance to fill in with led point information.
    * \returns True if point has been filled in.
    */
-  bool findLed(ubr_calibration::CalibrationData * msg);
-
-  /**
-   * \brief Attempts to find the ground plane.
-   * \param msg CalibrationData instance to fill in with ground points.
-   * \returns True if points have been filled in.
-   */
-  bool findGroundPlane(ubr_calibration::CalibrationData * msg);
+  bool find(ubr_calibration::CalibrationData * msg);
 
 private:
   void cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
   bool waitForCloud();
 
   ros::Subscriber subscriber_;  /// Incoming sensor_msgs::Image
-  ros::Publisher publisher_;  /// Outgoing geometry_msgs::PointStamped
+  ros::Publisher publisher_;  /// Outgoing sensor_msgs::PointCloud2
   LedClient client_;
 
   bool waiting_;
@@ -73,10 +54,12 @@ private:
 
   double threshold_;  /// Minimum value of diffs in order to trigger that this is an LED
   int max_iterations_;  /// Maximum number of cycles before we abort finding the LED
-
   bool output_debug_image_;
+  std::string gripper_led_frame_;
 
   tf::TransformListener listener_;
 };
 
-#endif  // UBR_CALIBRATION_LED_FINDER_H_
+}  // namespace ubr_calibration
+
+#endif  // UBR_CALIBRATION_CAPTURE_LED_FINDER_H_

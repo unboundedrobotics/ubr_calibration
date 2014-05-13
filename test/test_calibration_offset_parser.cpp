@@ -1,5 +1,6 @@
 #include <urdf/model.h>
-#include <ubr_calibration/update_urdf.h>
+#include <ubr_calibration/calibration_offset_parser.h>
+#include <ubr_calibration/models/chain.h>  // for rotation functions
 #include <gtest/gtest.h>
 
 std::string robot_description =
@@ -48,29 +49,31 @@ std::string robot_description_updated =
 "  </joint>\n"
 "  <link name=\"link_2\" />\n"
 "  <joint name=\"third_joint\" type=\"fixed\">\n"
-"    <origin rpy=\"4 3.5 6\" xyz=\"1 2 3.0526\" />\n"
+"    <origin rpy=\"0.10000000 -1.30000000 0.30000000\" xyz=\"4.00000000 5.00000000 6.05260000\" />\n"
 "    <parent link=\"link_2\" />\n"
 "    <child link=\"link_3\" />\n"
 "  </joint>\n"
 "  <link name=\"link_3\" />\n"
 "</robot>";
 
-TEST(UpdateUrdfTest, test_urdf_update)
+TEST(CalibrationOffsetParserTest, test_urdf_update)
 {
-  std::map<std::string, double> offsets;
+  ubr_calibration::CalibrationOffsetParser p;
 
-  offsets["second_joint"] = 0.245;  // should add a rising
-  
-  offsets["third_joint_x"] = 1;  // camera-like offset
-  offsets["third_joint_y"] = 2;
-  offsets["third_joint_z"] = 3;
-  offsets["third_joint_roll"] = 4;
-  offsets["third_joint_pitch"] = 5;
-  offsets["third_joint_yaw"] = 6;
+  p.add("second_joint");
+  p.addFrame("third_joint", true, true, true, true, true, true);
 
-  std::string s = updateURDF(robot_description, offsets);
+  double params[7] = {0.245, 4, 5, 6, 0, 0, 0};
+
+  // set angles
+  KDL::Rotation r = KDL::Rotation::RPY(0.1, 0.2, 0.3);
+  ubr_calibration::axis_magnitude_from_rotation(r, params[4], params[5], params[6]);
+
+  p.update(params);
+
+  std::string s = p.updateURDF(robot_description);
   
-  // google test fails if we give it all of s/robot_description_updated, so break this up
+  // google test fails if we give it all of robot_description_updated, so break this up
   std::vector<std::string> s_pieces;
   std::vector<std::string> robot_pieces;
 
@@ -79,7 +82,7 @@ TEST(UpdateUrdfTest, test_urdf_update)
 
   for (int i = 0; i < robot_pieces.size(); ++i)
   {
-    ASSERT_STREQ(s_pieces[i].c_str(), robot_pieces[i].c_str());
+    ASSERT_STREQ(robot_pieces[i].c_str(), s_pieces[i].c_str());
   }
 }
 

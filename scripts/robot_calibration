@@ -1,0 +1,203 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2014, Unbounded Robotics Inc. 
+# All rights reserved. 
+# 
+# Redistribution and use in source and binary forms, with or without 
+# modification, are permitted provided that the following conditions 
+# are met: 
+# 
+#  * Redistributions of source code must retain the above copyright 
+#    notice, this list of conditions and the following disclaimer. 
+#  * Redistributions in binary form must reproduce the above 
+#    copyright notice, this list of conditions and the following 
+#    disclaimer in the documentation and/or other materials provided 
+#    with the distribution. 
+#  * Neither the name of Unbounded Robotics Inc. nor the names of its 
+#    contributors may be used to endorse or promote products derived 
+#    from this software without specific prior written permission. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN 
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+# POSSIBILITY OF SUCH DAMAGE. 
+
+# Author: Michael Ferguson
+
+import argparse
+import os
+import rospkg
+import subprocess
+import time
+import yaml
+from lxml import etree
+from time import strftime
+
+def stop_drivers():
+    return (subprocess.call(["service", "ubr1-indigo", "stop"]) == 0)
+
+
+def start_drivers():
+    return (subprocess.call(["service", "ubr1-indigo", "start"]) == 0)
+
+
+def restart_drivers():
+    ok = stop_drivers()
+    time.sleep(1.0)  # nodelet unload/load needs time
+    return (ok and start_drivers())
+
+
+## @brief Updates the robot launch file
+## @param launch The current robot launch file
+## @param calibration The calibration data (a dictionary)
+## @param install_dir The directory to install to 
+def update_robot_launch(launch, calibration, install_dir):
+    launch_xml = etree.parse(launch)
+    for child in launch_xml.getroot():
+        if child.tag == "param":
+            if child.get("name") == "calibration_date":
+                child.set("value", strftime("%Y-%m-%d %H:%M:%S"))
+
+            elif child.get("name") == "robot_description":
+                child.set("command", "cat %s" % os.path.join(install_dir, calibration["robot_description"]))
+
+            elif child.get("name") in calibration.keys():
+                child.set("value", calibration[child.get("name")])
+
+        if child.tag == "arg":
+            if child.get("name") == "rgb_camera_info_url":
+                child.set("default", "file://%s" % os.path.join(install_dir, calibration["depth_camera_info_url"]))
+
+            elif child.get("name") == "depth_camera_info_url":
+                child.set("default", "file://%s" % os.path.join(install_dir, calibration["depth_camera_info_url"]))
+
+    launch_xml.write(os.path.join(install_dir, "robot.launch"))
+
+
+def copy_file(current, new, filename):
+    a = os.path.join(current, filename)
+    b = os.path.join(new, filename)
+    return (subprocess.call(["cp", a, b]) == 0)
+
+
+def get_calibration_dict(directory):
+    # Setup calibration data
+    calibration = dict()
+    # Load file
+    try:
+        calfile = open(os.path.join(directory, "calibration.yaml"))
+    except IOError:
+        print("Cannot open calibration.yaml")
+        return False
+    # Parse YAML
+    try:
+        calyaml = yaml.load(calfile)
+    except:
+        print("Cannot parse calibration.yaml")
+        return False
+    # Get dictionary data
+    try:
+        calibration["/head_camera/driver/z_offset_mm"] = str(int(calyaml["camera_z_offset"]*1000.0))
+    except KeyError:
+        calibration["/head_camera/driver/z_offset_mm"] = "0"
+    try:
+        calibration["/head_camera/driver/z_scaling"] = str(1.0 + calyaml["camera_z_scaling"])
+    except KeyError:
+        calibration["/head_camera/driver/z_scaling"] = "1.0"
+    calibration["depth_camera_info_url"] = calyaml["depth_info"]
+    calibration["rgb_camera_info_url"] = calyaml["rgb_info"]
+    calibration["robot_description"] = calyaml["urdf"]
+    return calibration
+
+
+def move_calibration(current_directory, new_directory):
+    calibration = get_calibration_dict(current_directory)
+
+    # install urdf, depth, rgb files
+    for name in ["depth_camera_info_url", "rgb_camera_info_url", "robot_description"]:
+        copy_file(current_directory, new_directory, calibration[name])
+
+    # update the robot.launch
+    update_robot_launch("/etc/ros/indigo/robot.launch", calibration, new_directory)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Tool for manipulating robot calibration settings")
+    parser.add_argument("--backup", help="Back up the current calibration", action="store_true")
+    parser.add_argument("--install", help="Load new calibration (restarts drivers)", action="store_true")
+    parser.add_argument("--test", help="Test a calibration without installing it (restarts drivers)", action="store_true")
+    parser.add_argument("--reset", help="Reset the calibration back to factory defaults (restarts drivers)", action="store_true")
+    parser.add_argument("--date", help="Get the timestamp of the current calibration", action="store_true")
+    parser.add_argument("--calibrate", help="Generate a new calibration", action="store_true")
+    parser.add_argument("--directory", help="Directory to load calibration from or backup to", default="/tmp")
+    args = parser.parse_args()
+
+    if args.date:
+        launch_xml = etree.parse("/etc/ros/indigo/robot.launch")
+        for child in launch_xml.getroot():
+            if child.tag == "param" and child.get("name") == "calibration_date":
+                print(child.get("value"))
+                exit(0)
+        print("Calibration date not found in robot.launch")
+        exit(-1)
+
+    if args.backup:
+        # TODO: store to directory using move_calibration
+        print("This command is not yet supported")
+        exit(0)
+
+    if args.install:
+        # Test permissions (but only show our clean error message)
+        FNULL = open(os.devnull, 'w')
+        if subprocess.call(["touch", "/etc/ros/indigo/robot.launch"], stderr=FNULL) != 0:
+            print("\nIt appears you do not have permission to edit the /etc/ros/indigo directory.")
+            print("Be sure to run robot_calibration with 'sudo -E' to preserve environment\n")
+            exit(-1)
+        # Ok, go ahead
+        move_calibration(args.directory, "/etc/ros/indigo")
+        if not restart_drivers():
+            print("\nWARNING: drivers may not have restarted\n")
+        exit(0)
+
+    if args.reset:
+        # Can we get to ubr1_bringup?
+        try:
+            rp = rospkg.RosPack()
+            bringup = rp.get_path("ubr1_bringup")
+        except:
+            print("\nCould not find ubr1_bringup package, is your ROS path correct?")
+            print("Be sure to run robot_calibration with 'sudo -E' to preserve environment\n")
+            exit(-1)
+        # Reset the robot.launch to factory defaults
+        copy_file(os.path.join(bringup, "launch"), "/etc/ros/indigo", "robot.launch")
+        restart_drivers()
+        exit(0)
+
+    if args.test:
+        # TODO stop_drivers()
+        # TODO: start local launch file
+        exit(0)
+
+    if args.calibrate:
+        try:
+            rp = rospkg.RosPack()
+            cal_pkg = rp.get_path("ubr_calibration")
+        except:
+            print("\nCould not find ubr_calibration package, is your ROS path correct?")
+            exit(-1)
+        pose_bag = os.path.join(cal_pkg, "launch", "calibration_poses.bag")
+        if subprocess.call(["rosrun", "ubr_calibration", "calibrate", pose_bag]) != 0:
+            print("Failed to run calibrate")
+            exit(-1)
+        exit(0)
+
+    parser.print_help()
+

@@ -3,7 +3,10 @@
  * Author: Michael Ferguson
  */
 
-#include <ubr_calibration/chain_manager.h>
+#include <ubr_calibration/capture/chain_manager.h>
+
+namespace ubr_calibration
+{
 
 // TODO: need mutex here?
 void ChainManager::stateCallback(const sensor_msgs::JointStateConstPtr& msg)
@@ -41,7 +44,7 @@ ChainManager::makePoint(const sensor_msgs::JointState& state, const std::vector<
 
 bool ChainManager::moveToState(const sensor_msgs::JointState& state)
 {
-  /* Split into head and arm */
+  // Split into head and arm
   control_msgs::FollowJointTrajectoryGoal head_goal;
   head_goal.trajectory.joint_names = head_joints_;
 
@@ -58,11 +61,11 @@ bool ChainManager::moveToState(const sensor_msgs::JointState& state)
   arm_goal.trajectory.points.push_back(p);
   arm_goal.goal_time_tolerance = ros::Duration(1.0);
 
-  /* Call actions */
+  // Call actions
   head_client_.sendGoal(head_goal);
   arm_client_.sendGoal(arm_goal);
 
-  /* Wait for results */
+  // Wait for results
   head_client_.waitForResult(ros::Duration(15.0));
   arm_client_.waitForResult(ros::Duration(15.0));
 
@@ -82,14 +85,14 @@ bool ChainManager::waitToSettle()
     getState(&state);
     bool settled = true;
 
-    /* For each joint in state message */
+    // For each joint in state message
     for (size_t j = 0; j < state.name.size(); ++j)
     {
-      /* Is this joint even a concern? */
+      // Is this joint even a concern?
       if (fabs(state.velocity[j]) < 0.001)
         continue;
 
-      /* Is this joint in head? */
+      // Is this joint in head?
       for (size_t i = 0; i < head_joints_.size(); ++i)
       {
         if (head_joints_[i] == state.name[j])
@@ -99,7 +102,7 @@ bool ChainManager::waitToSettle()
         }
       }
 
-      /* Is this joint in the arm? */
+      // Is this joint in the arm?
       for (size_t i = 0; i < arm_joints_.size(); ++i)
       {
         if (arm_joints_[i] == state.name[j])
@@ -109,15 +112,17 @@ bool ChainManager::waitToSettle()
         }
       }
 
-      /* If at least one joint is not settled, break out this for loop */
+      // If at least one joint is not settled, break out this for loop
       if (!settled)
         break;
     }
 
-    /* If all joints are settled, break out of while loop */
+    // If all joints are settled, break out of while loop
     if (settled)
       break;
   }
 
   return true;
 }
+
+}  // namespace ubr_calibration

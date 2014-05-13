@@ -37,6 +37,7 @@
 #ifndef UBR_CALIBRATION_PCL_CONVERSIONS_H_
 #define UBR_CALIBRATION_PCL_CONVERSIONS_H_
 
+/** \brief PCL never works. Try to fix a bit of that. */
 namespace pcl_broke_again
 {
 

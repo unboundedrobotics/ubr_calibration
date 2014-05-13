@@ -3,37 +3,31 @@
  * Author: Michael Ferguson
  */
 
-#ifndef UBR_CALIBRATION_CHECKERBOARD_FINDER_H_
-#define UBR_CALIBRATION_CHECKERBOARD_FINDER_H_
+#ifndef UBR_CALIBRATION_CAPTURE_CHECKERBOARD_FINDER_H_
+#define UBR_CALIBRATION_CAPTURE_CHECKERBOARD_FINDER_H_
 
 #include <ros/ros.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
-//#include <tf/transform_listener.h>
-//#include <sensor_msgs/PointCloud2.h>
-//#include <geometry_msgs/PointStamped.h>
+#include <ubr_calibration/capture/feature_finder.h>
 #include <ubr_calibration/CalibrationData.h>
 
 #include <opencv2/calib3d/calib3d.hpp>
-
-//#include <opencv/cv.h>
-//#include <opencv/highgui.h>
-
 #include <ubr_calibration/pcl_conversions.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <cv_bridge/cv_bridge.h>
 
-class CheckerboardFinder
+namespace ubr_calibration
+{
+
+/**
+ *  \brief This class processes the point cloud input to find a checkerboard
+ */
+class CheckerboardFinder : public FeatureFinder
 {
 public:
-  CheckerboardFinder(ros::NodeHandle & n) : waiting_(false)
-  {
-    subscriber_ = n.subscribe("/head_camera/depth_registered/points",
-                              1,
-                              &CheckerboardFinder::cameraCallback,
-                              this);
-  }
+  CheckerboardFinder(ros::NodeHandle & n);
 
   /**
    * \brief Attempts to find the checkerboard incoming data.
@@ -42,15 +36,16 @@ public:
    * \param points_y Number of checkerboard points in y
    * \returns True if point has been filled in.
    */
-  bool findCheckerboard(ubr_calibration::CalibrationData * msg,
-                        int points_x = 4, int points_y = 5);
+  bool find(ubr_calibration::CalibrationData * msg);
 
 private:
-  bool findInternal(ubr_calibration::CalibrationData * msg,
-                    int points_x, int points_y);
+  bool findInternal(ubr_calibration::CalibrationData * msg);
 
   void cameraCallback(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
   bool waitForCloud();
+
+  int points_x_;
+  int points_y_;
 
   ros::Subscriber subscriber_;  /// Incoming sensor_msgs::PointCloud2
 
@@ -58,4 +53,6 @@ private:
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_ptr_;
 };
 
-#endif  // UBR_CALIBRATION_CHECKERBOARD_FINDER_H_
+}  // namespace ubr_calibration
+
+#endif  // UBR_CALIBRATION_CAPTURE_CHECKERBOARD_FINDER_H_

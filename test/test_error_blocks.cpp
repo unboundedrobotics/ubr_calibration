@@ -1,5 +1,5 @@
 #include <urdf/model.h>
-#include <ubr_calibration/optimizer.h>
+#include <ubr_calibration/ceres/optimizer.h>
 #include <gtest/gtest.h>
 
 std::string robot_description =
@@ -185,11 +185,11 @@ std::string robot_description =
 
 TEST(OptimizerTest, error_blocks_maxwell)
 {
-  Optimizer opt(robot_description, "base_link", "gripper_led_frame");
+  ubr_calibration::Optimizer opt(robot_description, "base_link", "gripper_led_frame");
 
   std::vector<ubr_calibration::CalibrationData> data;
   ubr_calibration::CalibrationData msg;
-  msg.joint_states.name.resize(9);
+  msg.joint_states.name.resize(10);
   msg.joint_states.name[0] = "arm_lift_flex_joint";
   msg.joint_states.name[1] = "arm_shoulder_pan_joint";
   msg.joint_states.name[2] = "arm_shoulder_lift_joint";
@@ -199,7 +199,8 @@ TEST(OptimizerTest, error_blocks_maxwell)
   msg.joint_states.name[6] = "arm_wrist_roll_joint";
   msg.joint_states.name[7] = "head_pan_joint";
   msg.joint_states.name[8] = "head_tilt_joint";
-  msg.joint_states.position.resize(9);
+  msg.joint_states.name[9] = "arm_lift_joint";
+  msg.joint_states.position.resize(10);
   msg.joint_states.position[0] = 0.0;
   msg.joint_states.position[1] = -0.814830;
   msg.joint_states.position[2] = -0.00022290000000002586;
@@ -209,6 +210,7 @@ TEST(OptimizerTest, error_blocks_maxwell)
   msg.joint_states.position[6] = 0.0;
   msg.joint_states.position[7] = -0.8280187999999999;
   msg.joint_states.position[8] = 0.6358500000000002;
+  msg.joint_states.position[9] = 0.0;
   msg.rgbd_observations.resize(1);
   msg.rgbd_observations[0].header.frame_id = "head_camera_rgb_optical_frame";
   msg.rgbd_observations[0].point.x = -0.0143163670728;
@@ -219,6 +221,12 @@ TEST(OptimizerTest, error_blocks_maxwell)
   msg.world_observations[0].point.x = 0.0;
   msg.world_observations[0].point.y = 0.0;
   msg.world_observations[0].point.z = 0.0;
+  msg.rgbd_info.camera_info.P[0] = 100.0;  // fx
+  msg.rgbd_info.camera_info.P[5] = 100.0;  // fy
+  msg.rgbd_info.camera_info.P[2] = 320.0;  // cx
+  msg.rgbd_info.camera_info.P[6] = 240.0;  // cy
+  msg.rgbd_info.z_offset = 0.0;
+  msg.rgbd_info.z_scaling = 1.0;
   data.push_back(msg);
 
   msg.joint_states.position[1] = -0.019781999999999966;
