@@ -2,8 +2,8 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.22 (2014-05-12)
+-------------------
 * Refactor calibration
 * Contributors: Michael Ferguson
 
