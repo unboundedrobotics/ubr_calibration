@@ -90,6 +90,9 @@ public:
     // Calibrate model of Primesense sensor
     offsets_->add("camera_z_offset");
     offsets_->add("camera_z_scaling");
+    // Support checkerboards
+    if (data[0].world_observations[0].header.frame_id.compare("checkerboard") == 0)
+      offsets_->addFrame("checkerboard", true, true, true, true, true, true);
 
     // Allocate space
     free_params_ = new double[offsets_->size()];

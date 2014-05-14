@@ -213,6 +213,12 @@ bool LedFinder::find(ubr_calibration::CalibrationData * msg)
   trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), -0.0295, 0.023, 0.0));
   trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.0045, -0.023, 0.0));
 
+  // This is led order, to match the order of the commands/trackers.
+  // Used below to construct the name of the led frame.
+  // Not really essential right now, but would be important if we later let the
+  //   led position be a free parameter during the optimization.
+  uint8_t led_ids[] = {0, 3, 1, 2};
+
   int cycles = 0;
   while (true)
   {
@@ -349,7 +355,7 @@ bool LedFinder::find(ubr_calibration::CalibrationData * msg)
 
     // Push back expected location of point on robot
     std::stringstream ss;
-    ss << gripper_led_frame_ << int(t);
+    ss << gripper_led_frame_ << int(led_ids[t]);
     world_pt.header.frame_id = ss.str();
     world_pt.point.x = trackers[t].x_;
     world_pt.point.y = trackers[t].y_;
