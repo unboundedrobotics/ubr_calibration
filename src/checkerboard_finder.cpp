@@ -37,6 +37,7 @@ bool CheckerboardFinder::waitForCloud()
   while (waiting_ && (++count < 20))
   {
     ros::Duration(0.1).sleep();
+    ros::spinOnce();
   }
   return !waiting_;
 }

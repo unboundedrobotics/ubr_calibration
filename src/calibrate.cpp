@@ -65,10 +65,6 @@ int main(int argc, char** argv)
   bool verbose;
   nh.param<bool>("verbose_calibration", verbose, false);
 
-  // Move spinner here -- until we fix actionlib issues
-  ros::AsyncSpinner spinner(1);
-  spinner.start();
-
   // The calibration data
   std_msgs::String description_msg;
   std::vector<ubr_calibration::CalibrationData> data;
