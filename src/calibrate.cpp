@@ -282,7 +282,6 @@ int main(int argc, char** argv)
   }
 
   ROS_INFO("Done calibrating");
-  ROS_INFO("Run 'robot_calibration --install' to install the calibration");
 
   return 0;
 }
