@@ -42,17 +42,26 @@ from lxml import etree
 from time import strftime
 
 def stop_drivers(rosdistro):
-    return (subprocess.call(["service", "ubr1-%s" % rosdistro, "stop"]) == 0)
+    return (subprocess.call(["sudo", "service", "ubr1-%s" % rosdistro, "stop"]) == 0)
 
 
 def start_drivers(rosdistro):
-    return (subprocess.call(["service", "ubr1-%s" % rosdistro, "start"]) == 0)
+    return (subprocess.call(["sudo", "service", "ubr1-%s" % rosdistro, "start"]) == 0)
 
 
 def restart_drivers(rosdistro):
     ok = stop_drivers(rosdistro)
     time.sleep(1.0)  # nodelet unload/load needs time
     return (ok and start_drivers(rosdistro))
+
+
+def copy_file(current, new, filename):
+    a = os.path.join(current, filename)
+    b = os.path.join(new, filename)
+    if b.startswith("/etc"):
+        return (subprocess.call(["sudo", "cp", a, b]) == 0)
+    else:
+        return (subprocess.call(["cp", a, b]) == 0)
 
 
 ## @brief Updates the robot launch file
@@ -79,13 +88,8 @@ def update_robot_launch(launch, calibration, install_dir):
             elif child.get("name") == "depth_camera_info_url":
                 child.set("default", "file://%s" % os.path.join(install_dir, calibration["depth_camera_info_url"]))
 
-    launch_xml.write(os.path.join(install_dir, "robot.launch"))
-
-
-def copy_file(current, new, filename):
-    a = os.path.join(current, filename)
-    b = os.path.join(new, filename)
-    return (subprocess.call(["cp", a, b]) == 0)
+    launch_xml.write("/tmp/robot.launch")
+    copy_file("/tmp", install_dir, "robot.launch")
 
 
 def get_calibration_dict(directory):
@@ -168,7 +172,7 @@ if __name__ == "__main__":
         FNULL = open(os.devnull, 'w')
         if subprocess.call(["touch", "/etc/ros/%s/robot.launch" % rosdistro], stderr=FNULL) != 0:
             print("\nIt appears you do not have permission to edit the /etc/ros/%s directory." % rosdistro)
-            print("Be sure to run robot_calibration with 'sudo -E' to preserve environment\n")
+            print("Is this user a sudoer?\n")
             exit(-1)
         # Ok, go ahead
         move_calibration(args.directory, "/etc/ros/%s" % rosdistro, rosdistro)
