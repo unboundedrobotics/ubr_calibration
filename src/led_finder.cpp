@@ -154,7 +154,7 @@ LedFinder::LedFinder(ros::NodeHandle & n) :
   n.param<double>("led_finder_threshold", threshold_, 1000.0);
   n.param<int>("led_finder_max_iterations", max_iterations_, 50);
   n.param<bool>("led_finder_debug_image", output_debug_image_, false);
-  n.param<std::string>("led_finder_gripper_led_frame", gripper_led_frame_, "gripper_led_link");
+  n.param<std::string>("led_finder_gripper_led_frame", gripper_led_frame_, "wrist_roll_link");
 
   if (output_debug_image_)
     cv::namedWindow("led_finder");
@@ -208,11 +208,12 @@ bool LedFinder::find(ubr_calibration::CalibrationData * msg)
   *prev_cloud = *cloud_ptr_;
 
   // Initialize difference trackers
+  //  last three parameters are <x,y,z> coordinates of led in wrist_roll_link frame.
   std::vector<CloudDifferenceTracker> trackers;
-  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.0045, 0.023, 0.0));
-  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), -0.0295, -0.023, 0.0));
-  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), -0.0295, 0.023, 0.0));
-  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.0045, -0.023, 0.0));
+  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.061, 0.023, 0.026875));
+  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.027, -0.023, 0.026875));
+  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.027, 0.023, 0.026875));
+  trackers.push_back(CloudDifferenceTracker(cloud_ptr_->size(), 0.061, -0.023, 0.026875));
 
   // This is led order, to match the order of the commands/trackers.
   // Used below to construct the name of the led frame.
@@ -331,7 +332,7 @@ bool LedFinder::find(ubr_calibration::CalibrationData * msg)
     }
     catch(const tf::TransformException &ex)
     {
-      ROS_ERROR("Failed to transform point to gripper_led_link");
+      ROS_ERROR_STREAM("Failed to transform point to " << gripper_led_frame_);
       continue;
     }
     double distance = (world_pt.point.x * world_pt.point.x) +
@@ -339,7 +340,7 @@ bool LedFinder::find(ubr_calibration::CalibrationData * msg)
                       (world_pt.point.z * world_pt.point.z);
     if (distance > 0.1)
     {
-      ROS_ERROR_STREAM("Point was too far away from gripper_led_link: " << distance);
+      ROS_ERROR_STREAM("Point was too far away from " << gripper_led_frame_ << ": " << distance);
       continue;
     }
 

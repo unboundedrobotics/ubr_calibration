@@ -219,7 +219,7 @@ int main(int argc, char** argv)
   }
 
   // Create instance of optimizer
-  ubr_calibration::Optimizer opt(description_msg.data, "base_link", "gripper_led_link");
+  ubr_calibration::Optimizer opt(description_msg.data, "base_link", "wrist_roll_link");
   opt.optimize(data, verbose);
   if (verbose)
   {
