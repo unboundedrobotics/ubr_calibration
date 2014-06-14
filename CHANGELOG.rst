@@ -2,8 +2,8 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.25 (2014-06-13)
+-------------------
 * add missing depend on nav_msgs
 * Contributors: Michael Ferguson
 
