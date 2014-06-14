@@ -53,6 +53,10 @@ include_directories(include ${Boost_INCLUDE_DIRS}
                             ${orocos_kdl_INCLUDE_DIRS})
 link_directories(${orocos_kdl_LIBRARY_DIRS}) # this is a hack, will eventually be unneeded once orocos-kdl is fixed
 
+add_executable(calibrate_base src/calibrate_base.cpp)
+target_link_libraries(calibrate_base ${Boost_LIBRARIES}
+                                     ${catkin_LIBRARIES})
+
 if (${Ceres_FOUND})
 
 add_executable(calibrate src/calibrate.cpp
@@ -72,7 +76,7 @@ add_dependencies(calibrate ubr_calibration_gencpp
 
 add_subdirectory(test)
 
-install(TARGETS calibrate
+install(TARGETS calibrate calibrate_base
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY launch
