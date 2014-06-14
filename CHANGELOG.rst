@@ -2,6 +2,12 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* calibrate base odom/imu
+* updates for removal of gripper_led_link in urdf
+* Contributors: Michael Ferguson
+
 0.2.23 (2014-05-13)
 -------------------
 * fix python install
