@@ -2,6 +2,11 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* add missing depend on nav_msgs
+* Contributors: Michael Ferguson
+
 0.2.24 (2014-06-13)
 -------------------
 * calibrate base odom/imu
