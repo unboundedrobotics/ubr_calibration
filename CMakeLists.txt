@@ -26,6 +26,7 @@ find_package(catkin REQUIRED
     geometry_msgs
     kdl_parser
     message_generation
+    nav_msgs
     pcl_ros
     rosbag
     roscpp
