@@ -2,6 +2,6 @@
 Changelog for package ubr_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
+0.4.0 (2014-06-16)
 ------------------
 * First indigo release
