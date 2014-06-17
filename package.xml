@@ -6,7 +6,7 @@
   </description>
   <author>Michael Ferguson</author>
   <maintainer email="fergs@unboundedrobotics.com">Michael Ferguson</maintainer>
-  <license>All Rights Reserved</license>
+  <license>Apache2</license>
   <url>http://ros.org/wiki/ubr_calibration</url>
   
   <buildtool_depend>catkin</buildtool_depend>
